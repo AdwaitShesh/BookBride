@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { UserService } from '../lib/services/userService';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -46,31 +46,33 @@ const AuthPage = ({ navigation }: AuthPageProps) => {
 
     try {
       setIsLoading(true);
-      const response = await axios.post('http://localhost:3000/api/register', {
+
+      const result = await UserService.register({
         name,
         email,
+        username,
         password,
-        contact,
-        username
+        contact
       });
+
+      Alert.alert('Success', 'User registered successfully. Please verify your email.');
       
-      if (response.data.success) {
-        Alert.alert('Success', 'User registered successfully');
-        if (rememberMe) {
-          await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-        }
-        setName('');
-        setEmail('');
-        setPassword('');
-        setContact('');
-        setUsername('');
-        navigation.navigate('Home', { user: response.data.user });
-      } else {
-        Alert.alert('Error', response.data.message || 'Registration failed');
+      if (rememberMe) {
+        await AsyncStorage.setItem('user', JSON.stringify(result.user));
+        await AsyncStorage.setItem('token', result.token);
+        await AsyncStorage.setItem('refreshToken', result.refreshToken);
       }
+
+      setName('');
+      setEmail('');
+      setPassword('');
+      setContact('');
+      setUsername('');
+
+      navigation.navigate('Home', { user: result.user });
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to register user. Please try again.';
-      Alert.alert('Error', message);
+      console.error('Registration error:', error);
+      Alert.alert('Error', error.message || 'Failed to register user. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -86,23 +88,22 @@ const AuthPage = ({ navigation }: AuthPageProps) => {
 
     try {
       setIsLoading(true);
-      const response = await axios.post('http://localhost:3000/api/login', {
+
+      const result = await UserService.login({
         username: loginUsername,
         password
       });
-      
-      if (response.data.success) {
-        if (rememberMe) {
-          await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-          await AsyncStorage.setItem('token', response.data.token);
-        }
-        navigation.navigate('Home', { user: response.data.user });
-      } else {
-        Alert.alert('Error', response.data.message || 'Invalid credentials');
+
+      if (rememberMe) {
+        await AsyncStorage.setItem('user', JSON.stringify(result.user));
+        await AsyncStorage.setItem('token', result.token);
+        await AsyncStorage.setItem('refreshToken', result.refreshToken);
       }
+
+      navigation.navigate('Home', { user: result.user });
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to login. Please try again.';
-      Alert.alert('Error', message);
+      console.error('Login error:', error);
+      Alert.alert('Error', error.message || 'Failed to login. Please try again.');
     } finally {
       setIsLoading(false);
     }

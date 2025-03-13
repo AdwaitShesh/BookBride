@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  username      String    @unique
+  password      String
+  contact       String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isVerified    Boolean   @default(false)
+  role          UserRole  @default(USER)
+  profile       Profile?
+  sessions      Session[]
+  refreshTokens RefreshToken[]
+}
+
+model Profile {
+  id          String    @id @default(uuid())
+  bio         String?
+  avatar      String?
+  address     String?
+  city        String?
+  country     String?
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  device    String?
+  ip        String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  email     String
+  type      TokenType
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum TokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
