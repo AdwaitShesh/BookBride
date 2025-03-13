@@ -1,8 +1,7 @@
 const ENV = {
   development: {
     DATABASE_URL: "postgresql://bookbride:mysecretpassword@localhost:5432/bookbride?schema=public",
-    API_URL: "http://10.0.2.2:3000", // Android Emulator
-    // API_URL: "http://localhost:3000", // iOS Simulator
+    API_URL: "http://localhost:3000",
     APP_SECRET: "your-super-secret-key-here"
   },
   production: {
