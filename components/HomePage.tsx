@@ -243,12 +243,6 @@ const HomePage = ({ user }: HomePageProps) => {
               </View>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.userButton}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
-            </View>
-            <Text style={styles.username}>{user?.name || 'User'}</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -361,29 +355,6 @@ const HomePage = ({ user }: HomePageProps) => {
         </TouchableOpacity>
       </View>
     </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home" size={24} color="#00796b" />
-          <Text style={[styles.navText, styles.activeNavText]}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="search" size={24} color="#999" />
-          <Text style={styles.navText}>Search</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="add-circle" size={48} color="#00796b" style={styles.addButton} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="chatbubble-outline" size={24} color="#999" />
-          <Text style={styles.navText}>Messages</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="person-outline" size={24} color="#999" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -453,28 +424,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
-  },
-  userButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    backgroundColor: '#00796b',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  username: {
-    marginLeft: 8,
-    color: '#00796b',
-    fontWeight: '500',
   },
   heroBanner: {
     margin: wp('4%'),
@@ -776,35 +725,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '500',
     fontSize: wp('3.5%'),
-  },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: hp('8%'),
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingBottom: Platform.OS === 'ios' ? hp('2%') : 0,
-  },
-  navItem: {
-    alignItems: 'center',
-  },
-  navText: {
-    fontSize: wp('2.5%'),
-    color: '#999',
-    marginTop: 2,
-  },
-  activeNavText: {
-    color: '#00796b',
-    fontWeight: '500',
-  },
-  addButton: {
-    marginBottom: hp('4%'),
   },
   bookMeta: {
     flexDirection: 'row',

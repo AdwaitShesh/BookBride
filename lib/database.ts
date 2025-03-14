@@ -5,6 +5,7 @@ const REVIEWS_KEY = '@reviews';
 const ADDRESSES_KEY = '@addresses';
 const ORDERS_KEY = '@orders';
 const CART_KEY = '@cart';
+const USER_PROFILES_KEY = '@user_profiles';
 
 export interface Book {
   id: string;
@@ -16,6 +17,15 @@ export interface Book {
   sellerName: string;
   location: string;
   postedDate: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  avatar: string | null;
 }
 
 export interface Review {
@@ -350,6 +360,63 @@ export const DatabaseService = {
     } catch (error) {
       console.error('Error clearing cart:', error);
       throw error;
+    }
+  },
+
+  async getUserProfile(): Promise<UserProfile | null> {
+    try {
+      const userId = await this.getCurrentUserId();
+      if (!userId) throw new Error('User not authenticated');
+
+      const profilesJson = await AsyncStorage.getItem(USER_PROFILES_KEY);
+      const profiles: UserProfile[] = profilesJson ? JSON.parse(profilesJson) : [];
+      return profiles.find(profile => profile.id === userId) || null;
+    } catch (error) {
+      console.error('Error getting user profile:', error);
+      return null;
+    }
+  },
+
+  async updateUserProfile(profile: Omit<UserProfile, 'id'>): Promise<void> {
+    try {
+      const userId = await this.getCurrentUserId();
+      if (!userId) throw new Error('User not authenticated');
+
+      const profilesJson = await AsyncStorage.getItem(USER_PROFILES_KEY);
+      const profiles: UserProfile[] = profilesJson ? JSON.parse(profilesJson) : [];
+      
+      const existingProfileIndex = profiles.findIndex(p => p.id === userId);
+      const updatedProfile: UserProfile = { ...profile, id: userId };
+
+      if (existingProfileIndex >= 0) {
+        profiles[existingProfileIndex] = updatedProfile;
+      } else {
+        profiles.push(updatedProfile);
+      }
+
+      await AsyncStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  },
+
+  async getUserOrders(): Promise<Order[]> {
+    return this.getOrders(); // We already have this function, just create an alias for it
+  },
+
+  async getOrderById(orderId: string): Promise<Order | null> {
+    try {
+      const userId = await this.getCurrentUserId();
+      if (!userId) throw new Error('User not authenticated');
+
+      const ordersJson = await AsyncStorage.getItem(ORDERS_KEY);
+      const orders: Order[] = ordersJson ? JSON.parse(ordersJson) : [];
+      
+      return orders.find(order => order.id === orderId && order.userId === userId) || null;
+    } catch (error) {
+      console.error('Error getting order by id:', error);
+      return null;
     }
   },
 }; 
