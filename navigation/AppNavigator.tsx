@@ -5,6 +5,7 @@ import SellBook from '../screens/SellBook';
 import BookDetails from '../screens/BookDetails';
 import PaymentSelectionScreen from '../screens/PaymentSelectionScreen';
 import PaymentGatewayScreen from '../screens/PaymentGatewayScreen';
+import CartScreen from '../screens/CartScreen';
 import { Book } from '../lib/database';
 
 export type RootStackParamList = {
@@ -13,6 +14,7 @@ export type RootStackParamList = {
   BookDetails: { bookId: string };
   PaymentSelection: { book: Book };
   PaymentGateway: { book: Book; paymentMethod: string };
+  Cart: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -37,6 +39,13 @@ const AppNavigator = () => {
       <Stack.Screen
         name="PaymentGateway"
         component={PaymentGatewayScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="Cart"
+        component={CartScreen}
         options={{
           headerShown: false,
         }}

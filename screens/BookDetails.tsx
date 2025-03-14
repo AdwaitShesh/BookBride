@@ -81,7 +81,10 @@ const BookDetails = () => {
       });
       setNewReview({ rating: 5, comment: '' });
       setShowReviewForm(false);
-      fetchReviews();
+      
+      // Fetch updated reviews
+      const bookReviews = await DatabaseService.getBookReviews(bookId);
+      setReviews(bookReviews);
     } catch (error) {
       Alert.alert('Error', 'Failed to add review');
     }
@@ -95,6 +98,17 @@ const BookDetails = () => {
   const handleBuyNow = () => {
     if (!book) return;
     navigation.navigate('PaymentSelection', { book });
+  };
+
+  const handleAddToCart = async () => {
+    if (!book) return;
+    try {
+      await DatabaseService.addToCart(book);
+      Alert.alert('Success', 'Book added to cart!');
+    } catch (error) {
+      console.error('Error adding book to cart:', error);
+      Alert.alert('Error', 'Failed to add book to cart.');
+    }
   };
 
   if (loading || !book) {
@@ -288,12 +302,21 @@ const BookDetails = () => {
           <Text style={styles.priceLabel}>Price:</Text>
           <Text style={styles.price}>₹{book.price}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.buyNowButton}
-          onPress={handleBuyNow}
-        >
-          <Text style={styles.buyNowButtonText}>Buy Now</Text>
-        </TouchableOpacity>
+        <View style={styles.footerButtons}>
+          <TouchableOpacity
+            style={[styles.footerButton, styles.addToCartButton]}
+            onPress={handleAddToCart}
+          >
+            <Ionicons name="cart-outline" size={20} color="#fff" />
+            <Text style={styles.footerButtonText}>Add to Cart</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.footerButton, styles.buyNowButton]}
+            onPress={handleBuyNow}
+          >
+            <Text style={styles.footerButtonText}>Buy Now</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -594,36 +617,50 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   } as TextStyle,
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: SIZES.padding,
+    backgroundColor: '#fff',
+    padding: wp('4%'),
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.background,
+    borderTopColor: '#eee',
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: hp('2%'),
   },
   priceLabel: {
-    ...FONTS.h3,
-    color: COLORS.text,
-    marginRight: 8,
+    fontSize: wp('4%'),
+    color: '#666',
   },
   price: {
-    ...FONTS.h2,
-    color: COLORS.primary,
+    fontSize: wp('5%'),
+    fontWeight: 'bold',
+    color: '#00796b',
+    marginLeft: 8,
+  },
+  footerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: wp('3%'),
+  },
+  footerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: wp('3%'),
+    borderRadius: 8,
+  },
+  addToCartButton: {
+    backgroundColor: '#4db6ac',
   },
   buyNowButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SIZES.padding * 2,
-    paddingVertical: SIZES.padding,
-    borderRadius: SIZES.radius,
+    backgroundColor: '#00796b',
   },
-  buyNowButtonText: {
-    ...FONTS.h3,
-    color: COLORS.white,
+  footerButtonText: {
+    color: '#fff',
+    fontSize: wp('3.5%'),
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
 

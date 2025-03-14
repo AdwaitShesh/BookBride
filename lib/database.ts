@@ -4,6 +4,7 @@ const BOOKS_KEY = '@books';
 const REVIEWS_KEY = '@reviews';
 const ADDRESSES_KEY = '@addresses';
 const ORDERS_KEY = '@orders';
+const CART_KEY = '@cart';
 
 export interface Book {
   id: string;
@@ -307,6 +308,47 @@ export const DatabaseService = {
       return orders[orderIndex];
     } catch (error) {
       console.error('Error updating order status:', error);
+      throw error;
+    }
+  },
+
+  async getCartItems(): Promise<Book[]> {
+    try {
+      const cartJson = await AsyncStorage.getItem(CART_KEY);
+      return cartJson ? JSON.parse(cartJson) : [];
+    } catch (error) {
+      console.error('Error getting cart items:', error);
+      return [];
+    }
+  },
+
+  async addToCart(book: Book): Promise<void> {
+    try {
+      const cartItems = await this.getCartItems();
+      cartItems.push(book);
+      await AsyncStorage.setItem(CART_KEY, JSON.stringify(cartItems));
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      throw error;
+    }
+  },
+
+  async removeFromCart(bookId: string): Promise<void> {
+    try {
+      const cartItems = await this.getCartItems();
+      const updatedCart = cartItems.filter(item => item.id !== bookId);
+      await AsyncStorage.setItem(CART_KEY, JSON.stringify(updatedCart));
+    } catch (error) {
+      console.error('Error removing from cart:', error);
+      throw error;
+    }
+  },
+
+  async clearCart(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(CART_KEY);
+    } catch (error) {
+      console.error('Error clearing cart:', error);
       throw error;
     }
   },

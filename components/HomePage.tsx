@@ -33,6 +33,7 @@ type RootStackParamList = {
   Home: undefined;
   SellBook: undefined;
   BookDetails: { bookId: string };
+  Cart: undefined;
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -224,10 +225,16 @@ const HomePage = ({ user }: HomePageProps) => {
           </TouchableOpacity>
           <View style={styles.logoContainer}>
             <MaterialCommunityIcons name="book-open-page-variant" size={28} color="#00796b" />
-          <Text style={styles.logo}>BookBride</Text>
+            <Text style={styles.logo}>BookBride</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('Cart')}
+          >
+            <Ionicons name="cart-outline" size={24} color="#00796b" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton}>
             <Ionicons name="notifications-outline" size={24} color="#00796b" />
             <View style={styles.badgeContainer}>
@@ -798,6 +805,33 @@ const styles = StyleSheet.create({
   },
   addButton: {
     marginBottom: hp('4%'),
+  },
+  bookMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  bookOriginalPrice: {
+    fontSize: wp('3%'),
+    color: '#999',
+    textDecorationLine: 'line-through',
+    marginLeft: 8,
+  },
+  bookFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reviewsText: {
+    fontSize: wp('2.8%'),
+    color: '#666',
+    marginLeft: 4,
+  },
+  location: {
+    fontSize: wp('2.8%'),
+    color: '#666',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
 
