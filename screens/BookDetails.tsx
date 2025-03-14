@@ -51,6 +51,11 @@ const BookDetails = () => {
     const loadBookDetails = async () => {
       try {
         setLoading(true);
+        const bookId = route.params?.bookId;
+        if (!bookId) {
+          Alert.alert('Error', 'Book ID not found');
+          return;
+        }
         const bookData = await DatabaseService.getBookById(bookId);
         if (bookData) {
           setBook(bookData);
@@ -68,7 +73,15 @@ const BookDetails = () => {
     };
 
     loadBookDetails();
-  }, [bookId]);
+  }, [route.params]);
+
+  const getBookImage = () => {
+    if (!book) return require('../assets/placeholder-book.png');
+    if (book.imageUrl) return { uri: book.imageUrl };
+    if (book.image?.uri) return { uri: book.image.uri };
+    if (book.images?.[0]) return { uri: book.images[0] };
+    return require('../assets/placeholder-book.png');
+  };
 
   const handleAddReview = async () => {
     if (!newReview.comment.trim()) {
@@ -147,7 +160,7 @@ const BookDetails = () => {
         {/* Book Image */}
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: book?.imageUrl }} 
+            source={getBookImage()} 
             style={styles.bookImage as ImageStyle}
           />
           <View style={styles.discountBadge}>
@@ -161,8 +174,8 @@ const BookDetails = () => {
           <Text style={styles.bookAuthor}>by {book.author}</Text>
           
           <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{book.price}</Text>
-            <Text style={styles.originalPrice}>₹{book.price * 1.5}</Text>
+            <Text style={styles.price}>{book.price}</Text>
+            <Text style={styles.originalPrice}>{book.originalPrice}</Text>
           </View>
 
           <View style={styles.conditionContainer}>
@@ -296,7 +309,7 @@ const BookDetails = () => {
                   style={styles.suggestedBookImage as ImageStyle}
                 />
                 <Text style={styles.suggestedBookTitle} numberOfLines={2}>{item.title}</Text>
-                <Text style={styles.suggestedBookPrice}>₹{item.price}</Text>
+                <Text style={styles.suggestedBookPrice}>{item.price}</Text>
               </TouchableOpacity>
             )}
             keyExtractor={(item) => item.id}
@@ -307,7 +320,7 @@ const BookDetails = () => {
       <View style={styles.footer}>
         <View style={styles.priceContainer}>
           <Text style={styles.priceLabel}>Price:</Text>
-          <Text style={styles.price}>₹{book.price}</Text>
+          <Text style={styles.price}>{book.price}</Text>
         </View>
         <View style={styles.footerButtons}>
           <TouchableOpacity

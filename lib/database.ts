@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { v4 as uuidv4 } from 'uuid';
 
 const BOOKS_KEY = '@books';
 const REVIEWS_KEY = '@reviews';
@@ -7,18 +8,25 @@ const ORDERS_KEY = '@orders';
 const CART_KEY = '@cart';
 const USER_PROFILES_KEY = '@user_profiles';
 const RECENTLY_ADDED_KEY = '@recently_added';
+const WISHLIST_KEY = '@wishlist';
 
 export interface Book {
   id: string;
   title: string;
   author: string;
   price: number;
+  originalPrice?: number;
   condition: 'Like New' | 'Good' | 'Fair';
   imageUrl: string;
+  image?: { uri: string };
+  images?: string[];
   sellerName: string;
   location: string;
   postedDate: string;
   category: 'Engineering' | 'Computer Science' | 'Electronics' | 'Mechanical' | 'Civil' | 'Chemical';
+  description?: string;
+  rating?: number;
+  reviews?: number;
 }
 
 export interface UserProfile {
@@ -64,33 +72,73 @@ export interface Order {
   updatedAt: string;
 }
 
-export const DatabaseService = {
-  async getCurrentUserId(): Promise<string | null> {
-    try {
-      // For development, return a temporary user ID
-      return 'temp-user-123';
-    } catch (error) {
-      console.error('Error getting current user ID:', error);
-      return null;
-    }
-  },
+// Update the cart storage key to be user-specific
+const getCartStorageKey = async () => {
+  return CART_KEY;
+};
 
-  async getBooks(): Promise<Book[]> {
+// Update the orders storage key to be user-specific
+const getOrdersStorageKey = async () => {
+  return ORDERS_KEY;
+};
+
+// Get the wishlist storage key for the current user
+const getWishlistStorageKey = async () => {
+  return WISHLIST_KEY;
+};
+
+export class DatabaseService {
+  static async getCurrentUserId(): Promise<string> {
+    // Return a default user ID since we're removing authentication
+    return 'default_user';
+  }
+
+  static formatPrice(price: any): string {
+    if (price === undefined || price === null || price === '') {
+      return '₹0.00';
+    }
+    
+    if (typeof price === 'string' && price.startsWith('₹')) {
+      return price;
+    }
+    
+    let numericPrice: number;
+    if (typeof price === 'string') {
+      numericPrice = parseFloat(price.replace(/[^\d.]/g, ''));
+    } else {
+      numericPrice = Number(price);
+    }
+    
+    if (isNaN(numericPrice) || !isFinite(numericPrice)) {
+      return '₹0.00';
+    }
+    
+    return `₹${numericPrice.toFixed(2)}`;
+  }
+
+  static async getBooks(): Promise<Book[]> {
     try {
       const booksJson = await AsyncStorage.getItem(BOOKS_KEY);
-      return booksJson ? JSON.parse(booksJson) : [];
+      const books = booksJson ? JSON.parse(booksJson) : [];
+      
+      // Ensure all books have properly formatted prices
+      return books.map(book => ({
+        ...book,
+        price: this.formatPrice(book.price),
+        originalPrice: this.formatPrice(book.originalPrice || (book.price * 1.5))
+      }));
     } catch (error) {
       console.error('Error getting books:', error);
       return [];
     }
-  },
+  }
 
-  async addBook(bookData: Omit<Book, 'id' | 'postedDate'>): Promise<Book> {
+  static async addBook(bookData: Omit<Book, 'id' | 'postedDate'>): Promise<Book> {
     try {
       const books = await this.getBooks();
       const newBook = {
         ...bookData,
-        id: Date.now().toString(),
+        id: `book_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         postedDate: new Date().toISOString(),
       };
       
@@ -105,9 +153,9 @@ export const DatabaseService = {
       console.error('Error adding book:', error);
       throw error;
     }
-  },
+  }
 
-  async getRecentBooks(): Promise<Book[]> {
+  static async getRecentBooks(): Promise<Book[]> {
     try {
       const recentBooksStr = await AsyncStorage.getItem(RECENTLY_ADDED_KEY);
       if (!recentBooksStr) return [];
@@ -116,9 +164,9 @@ export const DatabaseService = {
       console.error('Error getting recent books:', error);
       return [];
     }
-  },
+  }
 
-  async getFeaturedBooks(limit: number = 3): Promise<Book[]> {
+  static async getFeaturedBooks(limit: number = 3): Promise<Book[]> {
     try {
       const books = await this.getBooks();
       return books.slice(0, limit);
@@ -126,23 +174,25 @@ export const DatabaseService = {
       console.error('Error getting featured books:', error);
       return [];
     }
-  },
+  }
 
-  async getBookById(id: string): Promise<Book> {
+  static async getBookById(id: string): Promise<Book> {
     try {
       const books = await this.getBooks();
       const book = books.find(b => b.id === id);
-      if (!book) {
-        throw new Error('Book not found');
-      }
-      return book;
+      if (!book) throw new Error('Book not found');
+      return {
+        ...book,
+        price: this.formatPrice(book.price),
+        originalPrice: this.formatPrice(book.originalPrice || (book.price * 1.5))
+      };
     } catch (error) {
-      console.error('Error getting book by id:', error);
-      throw error;
+      console.error('Error getting book by ID:', error);
+      throw new Error('Failed to get book');
     }
-  },
+  }
 
-  async getBookReviews(bookId: string): Promise<Review[]> {
+  static async getBookReviews(bookId: string): Promise<Review[]> {
     try {
       const reviewsJson = await AsyncStorage.getItem(REVIEWS_KEY);
       const allReviews: Review[] = reviewsJson ? JSON.parse(reviewsJson) : [];
@@ -153,14 +203,13 @@ export const DatabaseService = {
       console.error('Error getting book reviews:', error);
       return [];
     }
-  },
+  }
 
-  async addBookReview(bookId: string, review: { rating: number; comment: string }): Promise<void> {
+  static async addBookReview(bookId: string, review: { rating: number; comment: string }): Promise<void> {
     try {
       const reviewsJson = await AsyncStorage.getItem(REVIEWS_KEY);
       const allReviews: Review[] = reviewsJson ? JSON.parse(reviewsJson) : [];
       
-      // In a real app, you would get the current user's info from auth context
       const newReview: Review = {
         id: Date.now().toString(),
         bookId,
@@ -177,26 +226,23 @@ export const DatabaseService = {
       console.error('Error adding book review:', error);
       throw error;
     }
-  },
+  }
 
-  async getSuggestedBooks(currentBookId: string): Promise<Book[]> {
+  static async getSuggestedBooks(currentBookId: string): Promise<Book[]> {
     try {
       const books = await this.getBooks();
       const currentBook = await this.getBookById(currentBookId);
       
-      // Get books with similar titles or authors, excluding the current book
       const suggestions = books
         .filter(book => {
           if (book.id === currentBookId) return false;
           
-          // Check for similar titles (first word match)
           const currentTitleWords = currentBook.title.toLowerCase().split(' ');
           const bookTitleWords = book.title.toLowerCase().split(' ');
           const hasSimilarTitle = currentTitleWords.some(word => 
             bookTitleWords.some(w => w.includes(word) || word.includes(w))
           );
 
-          // Check for similar authors (first word match)
           const currentAuthorWords = currentBook.author.toLowerCase().split(' ');
           const bookAuthorWords = book.author.toLowerCase().split(' ');
           const hasSimilarAuthor = currentAuthorWords.some(word => 
@@ -205,27 +251,124 @@ export const DatabaseService = {
 
           return hasSimilarTitle || hasSimilarAuthor;
         })
-        .slice(0, 5); // Limit to 5 suggestions
+        .slice(0, 5);
 
       return suggestions;
     } catch (error) {
       console.error('Error getting suggested books:', error);
       return [];
     }
-  },
+  }
 
-  async saveAddress(address: Omit<Address, 'id' | 'userId' | 'createdAt'>): Promise<Address> {
+  static async addToCart(book: Book): Promise<void> {
     try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
+      const cartKey = await getCartStorageKey();
+      const cartItems = await AsyncStorage.getItem(cartKey) || '[]';
+      const cart = JSON.parse(cartItems);
+      
+      if (!cart.some((item: Book) => item.id === book.id)) {
+        cart.push(book);
+        await AsyncStorage.setItem(cartKey, JSON.stringify(cart));
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      throw new Error('Failed to add to cart');
+    }
+  }
 
+  static async getCartItems(): Promise<Book[]> {
+    try {
+      const cartKey = await getCartStorageKey();
+      const cartItems = await AsyncStorage.getItem(cartKey) || '[]';
+      return JSON.parse(cartItems);
+    } catch (error) {
+      console.error('Error getting cart items:', error);
+      return [];
+    }
+  }
+
+  static async removeFromCart(bookId: string): Promise<void> {
+    try {
+      const cartKey = await getCartStorageKey();
+      const cartItems = await AsyncStorage.getItem(cartKey) || '[]';
+      const cart = JSON.parse(cartItems);
+      const updatedCart = cart.filter((item: Book) => item.id !== bookId);
+      await AsyncStorage.setItem(cartKey, JSON.stringify(updatedCart));
+    } catch (error) {
+      console.error('Error removing from cart:', error);
+      throw new Error('Failed to remove from cart');
+    }
+  }
+
+  static async clearCart(): Promise<void> {
+    try {
+      const cartKey = await getCartStorageKey();
+      await AsyncStorage.removeItem(cartKey);
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      throw error;
+    }
+  }
+
+  static async addToWishlist(book: Book): Promise<void> {
+    try {
+      const wishlistKey = await getWishlistStorageKey();
+      const wishlistItems = await AsyncStorage.getItem(wishlistKey) || '[]';
+      const wishlist = JSON.parse(wishlistItems);
+      
+      if (!wishlist.some((item: Book) => item.id === book.id)) {
+        wishlist.push(book);
+        await AsyncStorage.setItem(wishlistKey, JSON.stringify(wishlist));
+      }
+    } catch (error) {
+      console.error('Error adding to wishlist:', error);
+      throw new Error('Failed to add to wishlist');
+    }
+  }
+
+  static async getWishlist(): Promise<Book[]> {
+    try {
+      const wishlistKey = await getWishlistStorageKey();
+      const wishlistItems = await AsyncStorage.getItem(wishlistKey) || '[]';
+      return JSON.parse(wishlistItems);
+    } catch (error) {
+      console.error('Error getting wishlist:', error);
+      return [];
+    }
+  }
+
+  static async removeFromWishlist(bookId: string): Promise<void> {
+    try {
+      const wishlistKey = await getWishlistStorageKey();
+      const wishlistItems = await AsyncStorage.getItem(wishlistKey) || '[]';
+      const wishlist = JSON.parse(wishlistItems);
+      const updatedWishlist = wishlist.filter((item: Book) => item.id !== bookId);
+      await AsyncStorage.setItem(wishlistKey, JSON.stringify(updatedWishlist));
+    } catch (error) {
+      console.error('Error removing from wishlist:', error);
+      throw new Error('Failed to remove from wishlist');
+    }
+  }
+
+  static async isInWishlist(bookId: string): Promise<boolean> {
+    try {
+      const wishlist = await this.getWishlist();
+      return wishlist.some(item => item.id === bookId);
+    } catch (error) {
+      console.error('Error checking wishlist:', error);
+      return false;
+    }
+  }
+
+  static async saveAddress(address: Omit<Address, 'id' | 'userId' | 'createdAt'>): Promise<Address> {
+    try {
       const addressesJson = await AsyncStorage.getItem(ADDRESSES_KEY);
       const addresses: Address[] = addressesJson ? JSON.parse(addressesJson) : [];
 
       const newAddress: Address = {
         ...address,
         id: Date.now().toString(),
-        userId,
+        userId: 'default_user',
         createdAt: new Date().toISOString(),
       };
 
@@ -236,82 +379,61 @@ export const DatabaseService = {
       console.error('Error saving address:', error);
       throw error;
     }
-  },
+  }
 
-  async getAddresses(): Promise<Address[]> {
+  static async getAddresses(): Promise<Address[]> {
     try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
-
       const addressesJson = await AsyncStorage.getItem(ADDRESSES_KEY);
       const addresses: Address[] = addressesJson ? JSON.parse(addressesJson) : [];
-      
-      return addresses
-        .filter(address => address.userId === userId)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return addresses;
     } catch (error) {
       console.error('Error getting addresses:', error);
-      throw error;
+      return [];
     }
-  },
+  }
 
-  async createOrder(orderData: {
-    bookId: string;
-    paymentMethod: Order['paymentMethod'];
-    address: Address;
-    status: Order['status'];
-    upiId?: string;
-  }): Promise<Order> {
+  static async createOrder(order: Order): Promise<Order> {
     try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
-
-      const ordersJson = await AsyncStorage.getItem(ORDERS_KEY);
+      const ordersKey = await getOrdersStorageKey();
+      const ordersJson = await AsyncStorage.getItem(ordersKey);
       const orders: Order[] = ordersJson ? JSON.parse(ordersJson) : [];
 
-      const newOrder: Order = {
-        ...orderData,
-        id: Date.now().toString(),
-        userId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const newOrder = {
+        ...order,
+        userId: 'default_user',
       };
 
       orders.push(newOrder);
-      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+      await AsyncStorage.setItem(ordersKey, JSON.stringify(orders));
+
+      // Clear the cart after successful order
+      await AsyncStorage.setItem(CART_KEY, JSON.stringify([]));
+
       return newOrder;
     } catch (error) {
       console.error('Error creating order:', error);
       throw error;
     }
-  },
+  }
 
-  async getOrders(): Promise<Order[]> {
+  static async getOrders(): Promise<Order[]> {
     try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
-
-      const ordersJson = await AsyncStorage.getItem(ORDERS_KEY);
-      const orders: Order[] = ordersJson ? JSON.parse(ordersJson) : [];
-
-      return orders
-        .filter(order => order.userId === userId)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const ordersKey = await getOrdersStorageKey();
+      const ordersJson = await AsyncStorage.getItem(ordersKey);
+      return ordersJson ? JSON.parse(ordersJson) : [];
     } catch (error) {
       console.error('Error getting orders:', error);
-      throw error;
+      return [];
     }
-  },
+  }
 
-  async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
+  static async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
     try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
-
-      const ordersJson = await AsyncStorage.getItem(ORDERS_KEY);
+      const ordersKey = await getOrdersStorageKey();
+      const ordersJson = await AsyncStorage.getItem(ordersKey);
       const orders: Order[] = ordersJson ? JSON.parse(ordersJson) : [];
 
-      const orderIndex = orders.findIndex(order => order.id === orderId && order.userId === userId);
+      const orderIndex = orders.findIndex(order => order.id === orderId);
       if (orderIndex === -1) throw new Error('Order not found');
 
       orders[orderIndex] = {
@@ -320,113 +442,71 @@ export const DatabaseService = {
         updatedAt: new Date().toISOString(),
       };
 
-      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+      await AsyncStorage.setItem(ordersKey, JSON.stringify(orders));
       return orders[orderIndex];
     } catch (error) {
       console.error('Error updating order status:', error);
       throw error;
     }
-  },
+  }
 
-  async getCartItems(): Promise<Book[]> {
+  static async getUserProfile(): Promise<UserProfile> {
+    // Return a default user profile
+    return {
+      id: 'default_user',
+      name: 'Guest User',
+      email: 'guest@example.com',
+      phone: '1234567890',
+      address: '',
+      avatar: null,
+    };
+  }
+
+  static async updateUserProfile(profile: Omit<UserProfile, 'id'>): Promise<void> {
     try {
-      const cartJson = await AsyncStorage.getItem(CART_KEY);
-      return cartJson ? JSON.parse(cartJson) : [];
-    } catch (error) {
-      console.error('Error getting cart items:', error);
-      return [];
-    }
-  },
-
-  async addToCart(book: Book): Promise<void> {
-    try {
-      const cartItems = await this.getCartItems();
-      cartItems.push(book);
-      await AsyncStorage.setItem(CART_KEY, JSON.stringify(cartItems));
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      throw error;
-    }
-  },
-
-  async removeFromCart(bookId: string): Promise<void> {
-    try {
-      const cartItems = await this.getCartItems();
-      const updatedCart = cartItems.filter(item => item.id !== bookId);
-      await AsyncStorage.setItem(CART_KEY, JSON.stringify(updatedCart));
-    } catch (error) {
-      console.error('Error removing from cart:', error);
-      throw error;
-    }
-  },
-
-  async clearCart(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(CART_KEY);
-    } catch (error) {
-      console.error('Error clearing cart:', error);
-      throw error;
-    }
-  },
-
-  async getUserProfile(): Promise<UserProfile | null> {
-    try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
-
-      const profilesJson = await AsyncStorage.getItem(USER_PROFILES_KEY);
-      const profiles: UserProfile[] = profilesJson ? JSON.parse(profilesJson) : [];
-      return profiles.find(profile => profile.id === userId) || null;
-    } catch (error) {
-      console.error('Error getting user profile:', error);
-      return null;
-    }
-  },
-
-  async updateUserProfile(profile: Omit<UserProfile, 'id'>): Promise<void> {
-    try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
-
-      const profilesJson = await AsyncStorage.getItem(USER_PROFILES_KEY);
-      const profiles: UserProfile[] = profilesJson ? JSON.parse(profilesJson) : [];
+      const profiles = await AsyncStorage.getItem(USER_PROFILES_KEY) || '[]';
+      const existingProfiles = JSON.parse(profiles);
+      const updatedProfile = { ...profile, id: 'default_user' };
       
-      const existingProfileIndex = profiles.findIndex(p => p.id === userId);
-      const updatedProfile: UserProfile = { ...profile, id: userId };
-
-      if (existingProfileIndex >= 0) {
-        profiles[existingProfileIndex] = updatedProfile;
+      const existingIndex = existingProfiles.findIndex((p: UserProfile) => p.id === 'default_user');
+      if (existingIndex >= 0) {
+        existingProfiles[existingIndex] = updatedProfile;
       } else {
-        profiles.push(updatedProfile);
+        existingProfiles.push(updatedProfile);
       }
 
-      await AsyncStorage.setItem(USER_PROFILES_KEY, JSON.stringify(profiles));
+      await AsyncStorage.setItem(USER_PROFILES_KEY, JSON.stringify(existingProfiles));
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error;
     }
-  },
+  }
 
-  async getUserOrders(): Promise<Order[]> {
-    return this.getOrders(); // We already have this function, just create an alias for it
-  },
-
-  async getOrderById(orderId: string): Promise<Order | null> {
+  static async getUserOrders(): Promise<Order[]> {
     try {
-      const userId = await this.getCurrentUserId();
-      if (!userId) throw new Error('User not authenticated');
+      const ordersKey = await getOrdersStorageKey();
+      const ordersJson = await AsyncStorage.getItem(ordersKey);
+      return ordersJson ? JSON.parse(ordersJson) : [];
+    } catch (error) {
+      console.error('Error getting user orders:', error);
+      return [];
+    }
+  }
 
-      const ordersJson = await AsyncStorage.getItem(ORDERS_KEY);
+  static async getOrderById(orderId: string): Promise<Order | null> {
+    try {
+      const ordersKey = await getOrdersStorageKey();
+      const ordersJson = await AsyncStorage.getItem(ordersKey);
       const orders: Order[] = ordersJson ? JSON.parse(ordersJson) : [];
       
-      return orders.find(order => order.id === orderId && order.userId === userId) || null;
+      return orders.find(order => order.id === orderId) || null;
     } catch (error) {
       console.error('Error getting order by id:', error);
       return null;
     }
-  },
+  }
 
-  async getBooksByCategory(category: string): Promise<Book[]> {
+  static async getBooksByCategory(category: string): Promise<Book[]> {
     try {
       const books = await this.getBooks();
       if (category === 'All') {
@@ -437,5 +517,5 @@ export const DatabaseService = {
       console.error('Error getting books by category:', error);
       return [];
     }
-  },
-}; 
+  }
+} 

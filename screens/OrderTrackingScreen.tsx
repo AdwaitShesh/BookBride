@@ -40,37 +40,76 @@ const OrderTrackingScreen = () => {
       const deliveryDate = new Date(currentDate.getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000);
       setEstimatedDelivery(deliveryDate.toLocaleDateString());
 
-      // Generate random coordinates for demonstration
-      const startLocation = { lat: 12.9716, lng: 77.5946 }; // Bangalore
-      const endLocation = { lat: 13.0827, lng: 80.2707 }; // Chennai
+      // Use order ID as a seed for randomization
+      const initialSeed = parseInt(orderId.replace(/\D/g, '')) || Date.now();
+      let currentSeed = initialSeed;
+      const random = (min: number, max: number) => {
+        currentSeed = (currentSeed * 9301 + 49297) % 233280;
+        const rnd = currentSeed / 233280;
+        return min + rnd * (max - min);
+      };
+
+      // Generate unique start and end locations based on order ID
+      const cities = [
+        { name: 'Bangalore', lat: 12.9716, lng: 77.5946 },
+        { name: 'Chennai', lat: 13.0827, lng: 80.2707 },
+        { name: 'Mumbai', lat: 19.0760, lng: 72.8777 },
+        { name: 'Delhi', lat: 28.6139, lng: 77.2090 },
+        { name: 'Kolkata', lat: 22.5726, lng: 88.3639 },
+        { name: 'Hyderabad', lat: 17.3850, lng: 78.4867 }
+      ];
+
+      // Select random start and end cities
+      const startCityIndex = Math.floor(random(0, cities.length));
+      let endCityIndex;
+      do {
+        endCityIndex = Math.floor(random(0, cities.length));
+      } while (endCityIndex === startCityIndex);
+
+      const startLocation = cities[startCityIndex];
+      const endLocation = cities[endCityIndex];
+
+      // Generate waypoints for a more realistic route
+      const numWaypoints = Math.floor(random(2, 5));
+      const waypoints = [];
+      for (let i = 0; i < numWaypoints; i++) {
+        const progress = (i + 1) / (numWaypoints + 1);
+        const lat = startLocation.lat + (endLocation.lat - startLocation.lat) * progress + random(-1, 1);
+        const lng = startLocation.lng + (endLocation.lng - startLocation.lng) * progress + random(-1, 1);
+        waypoints.push({ lat, lng });
+      }
+
+      // Calculate current location based on order status and time
+      const progress = Math.min(0.8, (Date.now() - new Date(orderData.createdAt).getTime()) / (7 * 24 * 60 * 60 * 1000));
       const currentLocation = {
-        lat: startLocation.lat + (endLocation.lat - startLocation.lat) * Math.random(),
-        lng: startLocation.lng + (endLocation.lng - startLocation.lng) * Math.random(),
+        lat: startLocation.lat + (endLocation.lat - startLocation.lat) * progress + random(-0.5, 0.5),
+        lng: startLocation.lng + (endLocation.lng - startLocation.lng) * progress + random(-0.5, 0.5)
       };
 
       setTrackingInfo({
         currentLocation,
         startLocation,
         endLocation,
+        waypoints,
         status: 'in_transit',
         updates: [
           {
             status: 'Order Placed',
             date: new Date(currentDate.getTime() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString(),
             time: '10:30 AM',
-            location: 'Bangalore Warehouse',
+            location: startLocation.name + ' Warehouse',
           },
           {
             status: 'Order Processed',
             date: new Date(currentDate.getTime() - 1 * 24 * 60 * 60 * 1000).toLocaleDateString(),
             time: '2:45 PM',
-            location: 'Bangalore Sorting Center',
+            location: startLocation.name + ' Sorting Center',
           },
           {
             status: 'In Transit',
             date: currentDate.toLocaleDateString(),
             time: '9:15 AM',
-            location: 'En Route to Destination',
+            location: 'En Route to ' + endLocation.name,
           },
         ],
       });
@@ -95,7 +134,7 @@ const OrderTrackingScreen = () => {
         <body style="margin: 0;">
           <div id="map"></div>
           <script>
-            const map = L.map('map').setView([${trackingInfo.currentLocation.lat}, ${trackingInfo.currentLocation.lng}], 8);
+            const map = L.map('map').setView([${trackingInfo.currentLocation.lat}, ${trackingInfo.currentLocation.lng}], 5);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
               attribution: '© OpenStreetMap contributors'
             }).addTo(map);
@@ -103,24 +142,33 @@ const OrderTrackingScreen = () => {
             // Add markers
             const startMarker = L.marker([${trackingInfo.startLocation.lat}, ${trackingInfo.startLocation.lng}])
               .addTo(map)
-              .bindPopup('Pickup Location');
+              .bindPopup('Pickup Location: ${trackingInfo.startLocation.name}');
 
             const currentMarker = L.marker([${trackingInfo.currentLocation.lat}, ${trackingInfo.currentLocation.lng}])
               .addTo(map)
-              .bindPopup('Current Location');
+              .bindPopup('Current Location')
+              .openPopup();
 
             const endMarker = L.marker([${trackingInfo.endLocation.lat}, ${trackingInfo.endLocation.lng}])
               .addTo(map)
-              .bindPopup('Delivery Location');
+              .bindPopup('Delivery Location: ${trackingInfo.endLocation.name}');
 
-            // Draw route line
+            // Draw route with waypoints
             const routePoints = [
               [${trackingInfo.startLocation.lat}, ${trackingInfo.startLocation.lng}],
+              ${trackingInfo.waypoints.map(wp => `[${wp.lat}, ${wp.lng}]`).join(',')},
               [${trackingInfo.currentLocation.lat}, ${trackingInfo.currentLocation.lng}],
+              ${trackingInfo.waypoints.slice().reverse().map(wp => `[${wp.lat}, ${wp.lng}]`).join(',')},
               [${trackingInfo.endLocation.lat}, ${trackingInfo.endLocation.lng}]
             ];
             
-            const routeLine = L.polyline(routePoints, {color: '#00796b'}).addTo(map);
+            const routeLine = L.polyline(routePoints, {
+              color: '#00796b',
+              weight: 3,
+              opacity: 0.8,
+              dashArray: '10, 10'
+            }).addTo(map);
+
             map.fitBounds(routeLine.getBounds());
           </script>
         </body>

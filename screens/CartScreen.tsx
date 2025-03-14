@@ -1,21 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
   Image,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { DatabaseService, Book } from '../lib/database';
 import { Ionicons } from '@expo/vector-icons';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import CustomHeader from '../components/CustomHeader';
+import { COLORS } from '../constants';
 
 type CartScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Cart'>;
 
@@ -24,21 +25,19 @@ const CartScreen = () => {
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<CartScreenNavigationProp>();
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchCartItems();
-    });
+  useFocusEffect(
+    useCallback(() => {
+      loadCartItems();
+    }, [])
+  );
 
-    return unsubscribe;
-  }, [navigation]);
-
-  const fetchCartItems = async () => {
+  const loadCartItems = async () => {
     try {
       setLoading(true);
       const items = await DatabaseService.getCartItems();
       setCartItems(items);
     } catch (error) {
-      console.error('Error fetching cart items:', error);
+      console.error('Error loading cart items:', error);
       Alert.alert('Error', 'Failed to load cart items');
     } finally {
       setLoading(false);
@@ -56,46 +55,69 @@ const CartScreen = () => {
     }
   };
 
-  const handleBuyNow = (book: Book) => {
-    navigation.navigate('PaymentSelection', { book });
+  const handleAddToWishlist = async (book: Book) => {
+    try {
+      await DatabaseService.addToWishlist(book);
+      Alert.alert('Success', 'Item added to wishlist');
+    } catch (error) {
+      console.error('Error adding item to wishlist:', error);
+      Alert.alert('Error', 'Failed to add item to wishlist');
+    }
   };
 
-  const renderCartItem = ({ item }: { item: Book }) => (
-    <View style={styles.cartItem}>
-      <TouchableOpacity
-        style={styles.itemContent}
-        onPress={() => navigation.navigate('BookDetails', { bookId: item.id })}
-      >
-        <Image source={{ uri: item.imageUrl }} style={styles.bookImage} />
-        <View style={styles.bookInfo}>
-          <Text style={styles.bookTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={styles.bookAuthor}>{item.author}</Text>
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{item.price}</Text>
-            <Text style={styles.originalPrice}>
-              ₹{Math.round(item.price * 1.5)}
+  const calculateTotal = () => {
+    return cartItems.reduce((total, item) => {
+      const price = typeof item.price === 'string' 
+        ? parseFloat(item.price.replace(/[^\d.]/g, ''))
+        : Number(item.price);
+      return total + (isNaN(price) ? 0 : price);
+    }, 0);
+  };
+
+  const renderCartItem = ({ item }: { item: Book }) => {
+    // Calculate the original price safely
+    const price = typeof item.price === 'string'
+      ? parseFloat(item.price.replace(/[^\d.]/g, ''))
+      : Number(item.price);
+    const originalPrice = !isNaN(price) ? price * 1.5 : 0;
+
+    return (
+      <View style={styles.cartItem}>
+        <TouchableOpacity
+          style={styles.itemContent}
+          onPress={() => navigation.navigate('BookDetails', { bookId: item.id })}
+        >
+          <Image source={{ uri: item.imageUrl }} style={styles.bookImage} />
+          <View style={styles.bookInfo}>
+            <Text style={styles.bookTitle} numberOfLines={2}>
+              {item.title || 'Untitled'}
             </Text>
+            <Text style={styles.bookAuthor}>{item.author || 'Unknown Author'}</Text>
+            <View style={styles.priceContainer}>
+              <Text style={styles.price}>{DatabaseService.formatPrice(price)}</Text>
+              <Text style={styles.originalPrice}>
+                {DatabaseService.formatPrice(originalPrice)}
+              </Text>
+            </View>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.wishlistButton}
+                onPress={() => handleAddToWishlist(item)}
+              >
+                <Ionicons name="heart-outline" size={24} color={COLORS.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => handleRemoveFromCart(item.id)}
+              >
+                <Ionicons name="trash-outline" size={24} color="#ff6b6b" />
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.buyButton}
-              onPress={() => handleBuyNow(item)}
-            >
-              <Text style={styles.buyButtonText}>Buy Now</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => handleRemoveFromCart(item.id)}
-            >
-              <Ionicons name="trash-outline" size={24} color="#00796b" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const EmptyCartComponent = () => (
     <View style={styles.emptyCart}>
@@ -103,7 +125,7 @@ const CartScreen = () => {
       <Text style={styles.emptyText}>Your cart is empty</Text>
       <TouchableOpacity
         style={styles.shopButton}
-        onPress={() => navigation.navigate('MainTabs')}
+        onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
       >
         <Text style={styles.shopButtonText}>Start Shopping</Text>
       </TouchableOpacity>
@@ -116,7 +138,7 @@ const CartScreen = () => {
       <FlatList
         data={cartItems}
         renderItem={renderCartItem}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.id || Date.now().toString()}
         contentContainerStyle={styles.cartList}
         ListEmptyComponent={EmptyCartComponent}
         showsVerticalScrollIndicator={false}
@@ -124,12 +146,12 @@ const CartScreen = () => {
       {cartItems.length > 0 && (
         <View style={styles.footer}>
           <View style={styles.totalContainer}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalText}>Total:</Text>
             <Text style={styles.totalAmount}>
-              ₹{cartItems.reduce((sum, item) => sum + item.price, 0)}
+              {DatabaseService.formatPrice(calculateTotal())}
             </Text>
           </View>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={styles.checkoutButton}
             onPress={() => {
               if (cartItems.length > 0) {
@@ -137,7 +159,7 @@ const CartScreen = () => {
               }
             }}
           >
-            <Text style={styles.checkoutButtonText}>Checkout All</Text>
+            <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -152,6 +174,7 @@ const styles = StyleSheet.create({
   },
   cartList: {
     padding: wp('4%'),
+    paddingBottom: hp('15%'),
   },
   cartItem: {
     backgroundColor: '#fff',
@@ -195,7 +218,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: wp('4%'),
     fontWeight: 'bold',
-    color: '#00796b',
+    color: COLORS.primary,
   },
   originalPrice: {
     fontSize: wp('3.2%'),
@@ -206,17 +229,11 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
-  buyButton: {
-    backgroundColor: '#00796b',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-  },
-  buyButtonText: {
-    color: '#fff',
-    fontWeight: '500',
+  wishlistButton: {
+    padding: 8,
+    marginRight: 8,
   },
   removeButton: {
     padding: 8,
@@ -234,7 +251,7 @@ const styles = StyleSheet.create({
     marginBottom: hp('3%'),
   },
   shopButton: {
-    backgroundColor: '#00796b',
+    backgroundColor: COLORS.primary,
     paddingVertical: hp('1.5%'),
     paddingHorizontal: wp('8%'),
     borderRadius: 8,
@@ -245,6 +262,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#fff',
     padding: wp('4%'),
     borderTopWidth: 1,
@@ -256,18 +277,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: hp('2%'),
   },
-  totalLabel: {
+  totalText: {
     fontSize: wp('4%'),
     color: '#666',
   },
   totalAmount: {
     fontSize: wp('5%'),
     fontWeight: 'bold',
-    color: '#00796b',
+    color: COLORS.primary,
   },
   checkoutButton: {
-    backgroundColor: '#00796b',
-    padding: wp('4%'),
+    backgroundColor: COLORS.primary,
+    paddingVertical: hp('1.5%'),
     borderRadius: 8,
     alignItems: 'center',
   },

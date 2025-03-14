@@ -26,45 +26,65 @@ const AllBooksScreen = () => {
   const route = useRoute();
   const { title, books, type } = route.params as RouteParams;
 
-  const renderBook = ({ item }: { item: BookItem }) => (
-    <TouchableOpacity
-      style={styles.bookCard}
-      onPress={() => navigation.navigate('BookDetails', { bookId: item.id })}
-    >
-      <View style={styles.bookImageContainer}>
-        <Image source={item.image} style={styles.bookImage} />
-        {type === 'recent' && (
-          <View style={styles.timeStampBadge}>
-            <Text style={styles.timeStampText}>{item.postedDate}</Text>
+  const renderBook = ({ item }: { item: BookItem }) => {
+    let discount = 0;
+    try {
+      const currentPrice = typeof item.price === 'string' 
+        ? parseFloat(item.price.replace(/[^\d.]/g, '')) 
+        : item.price || 0;
+      
+      const originalPrice = typeof item.originalPrice === 'string'
+        ? parseFloat(item.originalPrice.replace(/[^\d.]/g, ''))
+        : item.originalPrice || currentPrice * 1.5;
+      
+      if (originalPrice > 0) {
+        discount = Math.round((1 - (currentPrice / originalPrice)) * 100);
+      }
+    } catch (error) {
+      console.error('Error calculating discount:', error);
+      discount = 0;
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.bookCard}
+        onPress={() => navigation.navigate('BookDetails', { bookId: item.id })}
+      >
+        <View style={styles.bookImageContainer}>
+          <Image source={item.image} style={styles.bookImage} />
+          {type === 'recent' && (
+            <View style={styles.timeStampBadge}>
+              <Text style={styles.timeStampText}>{item.postedDate}</Text>
+            </View>
+          )}
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountText}>
+              {discount}% OFF
+            </Text>
           </View>
-        )}
-        <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>
-            {Math.round((1 - parseInt(item.price.substring(1)) / parseInt(item.originalPrice.substring(1))) * 100)}% OFF
-          </Text>
         </View>
-      </View>
-      <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>{item.author}</Text>
-        <View style={styles.bookMeta}>
-          <Text style={styles.bookPrice}>{item.price}</Text>
-          <Text style={styles.bookOriginalPrice}>{item.originalPrice}</Text>
-        </View>
-        <View style={styles.bookFooter}>
-          <View style={styles.ratingContainer}>
-            <AntDesign name="star" size={12} color="#FFD700" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
-            <Text style={styles.reviewsText}>({item.reviews})</Text>
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.bookAuthor} numberOfLines={1}>{item.author}</Text>
+          <View style={styles.bookMeta}>
+            <Text style={styles.bookPrice}>{item.price}</Text>
+            <Text style={styles.bookOriginalPrice}>{item.originalPrice}</Text>
           </View>
-          <Text style={styles.location}>
-            <Ionicons name="location-outline" size={12} color="#666" />
-            {item.location}
-          </Text>
+          <View style={styles.bookFooter}>
+            <View style={styles.ratingContainer}>
+              <AntDesign name="star" size={12} color="#FFD700" />
+              <Text style={styles.ratingText}>{item.rating}</Text>
+              <Text style={styles.reviewsText}>({item.reviews})</Text>
+            </View>
+            <Text style={styles.location}>
+              <Ionicons name="location-outline" size={12} color="#666" />
+              {item.location}
+            </Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>

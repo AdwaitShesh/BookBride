@@ -13,6 +13,8 @@ import {
   ImageBackground,
   RefreshControl,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   Ionicons,
@@ -39,6 +41,7 @@ type RootStackParamList = {
     books: BookItem[];
     type: 'recent' | 'featured';
   };
+  Wishlist: undefined;
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -69,6 +72,7 @@ type BookItem = {
   location: string;
   postedDate: string;
   category: string;
+  featured: boolean;
 };
 
 type CategoryItem = {
@@ -87,10 +91,14 @@ const HomePage = ({ user }: HomePageProps) => {
   const [filteredBooks, setFilteredBooks] = useState<BookItem[]>([]);
   const [searchResults, setSearchResults] = useState<BookItem[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [books, setBooks] = useState<BookItem[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<string[]>([]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       fetchBooks();
+      loadWishlistStatus();
     });
 
     return unsubscribe;
@@ -98,52 +106,66 @@ const HomePage = ({ user }: HomePageProps) => {
 
   const fetchBooks = async () => {
     try {
-      const [recentBooks, featured] = await Promise.all([
-        DatabaseService.getRecentBooks(),
-        DatabaseService.getFeaturedBooks(),
-      ]);
-
-      const mappedRecentBooks = recentBooks.map(book => ({
+      setLoading(true);
+      const booksData = await DatabaseService.getBooks();
+      
+      const mappedBooks = booksData.map(book => ({
         id: book.id,
         title: book.title,
         author: book.author,
-        price: `₹${book.price}`,
-        originalPrice: `₹${book.price * 1.5}`,
+        price: typeof book.price === 'string' ? book.price : `₹${book.price || 0}`,
+        originalPrice: typeof book.originalPrice === 'string' ? book.originalPrice : `₹${(book.price || 0) * 1.5}`,
         condition: book.condition,
-        image: { uri: book.imageUrl },
+        image: book.imageUrl ? { uri: book.imageUrl } : 
+               book.image?.uri ? { uri: book.image.uri } :
+               book.image ? book.image : 
+               require('../assets/placeholder-book.png'),
         rating: 4.5,
         reviews: 0,
-        seller: book.sellerName,
-        location: book.location,
+        seller: book.sellerName || book.seller?.name || 'Unknown Seller',
+        location: book.location || 'Unknown Location',
         postedDate: formatPostedDate(book.postedDate),
-        category: book.category,
+        category: book.category || 'Uncategorized',
+        featured: Math.random() > 0.5,
       }));
-
-      setRecentlyAddedBooks(mappedRecentBooks);
+      
+      setRecentlyAddedBooks(mappedBooks);
+      setFeaturedBooks(mappedBooks);
       
       // Filter books based on active category
       if (activeCategory === 'All') {
-        setFilteredBooks(mappedRecentBooks);
+        setFilteredBooks(mappedBooks);
       } else {
-        setFilteredBooks(mappedRecentBooks.filter(book => book.category === activeCategory));
+        setFilteredBooks(mappedBooks.filter(book => book.category === activeCategory));
       }
-
-      setFeaturedBooks(featured.map(book => ({
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        price: `₹${book.price}`,
-        originalPrice: `₹${book.price * 1.5}`,
-        condition: book.condition,
-        image: { uri: book.imageUrl },
-        rating: 4.5,
-        reviews: 0,
-        seller: book.sellerName,
-        location: book.location,
-        postedDate: 'Just now',
-      })));
     } catch (error) {
       console.error('Error fetching books:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadWishlistStatus = async () => {
+    try {
+      const wishlist = await DatabaseService.getWishlist();
+      setWishlistItems(wishlist.map(item => item.id));
+    } catch (error) {
+      console.error('Error loading wishlist status:', error);
+    }
+  };
+
+  const handleToggleWishlist = async (book: BookItem) => {
+    try {
+      if (wishlistItems.includes(book.id)) {
+        await DatabaseService.removeFromWishlist(book.id);
+        setWishlistItems(prev => prev.filter(id => id !== book.id));
+      } else {
+        await DatabaseService.addToWishlist(book);
+        setWishlistItems(prev => [...prev, book.id]);
+      }
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+      Alert.alert('Error', 'Failed to update wishlist');
     }
   };
 
@@ -188,6 +210,13 @@ const HomePage = ({ user }: HomePageProps) => {
 
   const handleCategoryPress = (category: string) => {
     setActiveCategory(category);
+    
+    if (category === 'All') {
+      setFilteredBooks(recentlyAddedBooks);
+    } else {
+      const filtered = recentlyAddedBooks.filter(book => book.category === category);
+      setFilteredBooks(filtered);
+    }
   };
 
   const searchStringMatch = (text: string, searchTerm: string): boolean => {
@@ -269,7 +298,13 @@ const HomePage = ({ user }: HomePageProps) => {
   );
   };
 
-  const renderBookCard = (book: BookItem) => (
+  const renderBookCard = (book: BookItem) => {
+    const isInWishlist = wishlistItems.includes(book.id);
+    const priceString = typeof book.price === 'string' ? book.price : `₹${book.price || 0}`;
+    const originalPriceString = typeof book.originalPrice === 'string' ? 
+      book.originalPrice : `₹${(book.price || 0) * 1.5}`;
+    
+    return (
     <TouchableOpacity 
       key={book.id} 
       style={styles.bookCard}
@@ -277,44 +312,59 @@ const HomePage = ({ user }: HomePageProps) => {
     >
       <View style={styles.bookImageContainer}>
         <Image source={book.image} style={styles.bookImage} />
+          <View style={styles.timeStampBadge}>
+            <Text style={styles.timeStampText}>{book.postedDate}</Text>
+          </View>
         <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>
-            {Math.round((1 - parseInt(book.price.substring(1)) / parseInt(book.originalPrice.substring(1))) * 100)}% OFF
-          </Text>
+            <Text style={styles.discountText}>33% OFF</Text>
         </View>
-        <TouchableOpacity style={styles.wishlistButton}>
-          <AntDesign name="heart" size={18} color="#00796b" />
+        <TouchableOpacity 
+          style={styles.wishlistButton}
+          onPress={() => handleToggleWishlist(book)}
+        >
+          <Ionicons 
+            name={isInWishlist ? "heart" : "heart-outline"} 
+            size={24} 
+            color={isInWishlist ? "#ff6b6b" : "#fff"} 
+          />
         </TouchableOpacity>
       </View>
       <View style={styles.bookInfo}>
         <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>
+        <Text style={styles.bookAuthor}>{book.author}</Text>
         <View style={styles.bookMeta}>
-          <Text style={styles.bookPrice}>{book.price}</Text>
-          <Text style={styles.bookOriginalPrice}>{book.originalPrice}</Text>
+            <Text style={styles.bookPrice}>{priceString}</Text>
+            <Text style={styles.bookOriginalPrice}>{originalPriceString}</Text>
         </View>
         <View style={styles.bookFooter}>
           <View style={styles.ratingContainer}>
-            <AntDesign name="star" size={12} color="#FFD700" />
+              <Ionicons name="star" size={14} color="#FFC107" />
             <Text style={styles.ratingText}>{book.rating}</Text>
             <Text style={styles.reviewsText}>({book.reviews})</Text>
           </View>
-          <Text style={styles.location}>
-            <Ionicons name="location-outline" size={12} color="#666" />
-            {book.location}
-          </Text>
+            <View style={styles.location}>
+              <Ionicons name="location-outline" size={14} color="#666" />
+              <Text style={styles.locationText}>{book.location}</Text>
+            </View>
         </View>
       </View>
     </TouchableOpacity>
   );
+  };
 
-  const handleSeeAll = (type: 'recent' | 'featured') => {
-    const books = type === 'recent' ? recentlyAddedBooks : featuredBooks;
-    const title = type === 'recent' ? 'Recently Added Books' : 'Featured Books';
+  const handleSeeAllRecent = () => {
     navigation.navigate('AllBooks', { 
-      title,
-      books,
-      type
+      title: 'Recent Books', 
+      books: filteredBooks, 
+      type: 'recent' 
+    });
+  };
+
+  const handleSeeAllFeatured = () => {
+    navigation.navigate('AllBooks', { 
+      title: 'Featured Books', 
+      books: filteredBooks.filter(book => book.featured), 
+      type: 'featured' 
     });
   };
 
@@ -343,14 +393,6 @@ const HomePage = ({ user }: HomePageProps) => {
           >
             <Ionicons name="cart-outline" size={24} color="#00796b" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="notifications-outline" size={24} color="#00796b" />
-            <View style={styles.badgeContainer}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -371,9 +413,6 @@ const HomePage = ({ user }: HomePageProps) => {
             <View style={styles.bannerOverlay}>
               <Text style={styles.bannerTitle}>Engineering Books Marketplace</Text>
               <Text style={styles.bannerSubtitle}>Buy and sell used engineering textbooks</Text>
-              <TouchableOpacity style={styles.bannerButton}>
-                <Text style={styles.bannerButtonText}>Explore Now</Text>
-              </TouchableOpacity>
             </View>
           </ImageBackground>
       </View>
@@ -405,136 +444,124 @@ const HomePage = ({ user }: HomePageProps) => {
       </View>
 
       {/* Categories */}
-      <View style={styles.section}>
+      <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Categories</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {categories.map(category => (
-              <TouchableOpacity
-                key={category.name}
+        <ScrollView 
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContainer}
+        >
+          {categories.map((category, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.categoryItem,
+                activeCategory === category.name && styles.activeCategoryItem
+              ]}
+              onPress={() => handleCategoryPress(category.name)}
+            >
+              <FontAwesome5 
+                name={category.icon} 
+                size={24} 
+                color={activeCategory === category.name ? '#fff' : '#00796b'} 
+              />
+              <Text 
                 style={[
-                  styles.categoryCard,
-                  activeCategory === category.name && styles.activeCategoryCard,
+                  styles.categoryName,
+                  activeCategory === category.name && styles.activeCategoryName
                 ]}
-                onPress={() => handleCategoryPress(category.name)}
               >
-                <FontAwesome5
-                  name={category.icon}
-                  size={24}
-                  color={activeCategory === category.name ? '#fff' : '#00796b'}
-                />
-                <Text
-                  style={[
-                    styles.categoryName,
-                    activeCategory === category.name && styles.activeCategoryName,
-                  ]}
-                >
-                  {category.name}
-                </Text>
-                <Text
-                  style={[
-                    styles.categoryCount,
-                    activeCategory === category.name && styles.activeCategoryCount,
-                  ]}
-                >
-                  {category.count}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+                {category.name}
+              </Text>
+              <Text 
+                style={[
+                  styles.categoryCount,
+                  activeCategory === category.name && styles.activeCategoryCount
+                ]}
+              >
+                {category.count}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Featured Books */}
-      <View style={styles.section}>
+      {/* Sell Book Button - Added below categories */}
+      <TouchableOpacity 
+        style={styles.sellBookButton}
+        onPress={handleSellBook}
+      >
+        <View style={styles.sellBookContent}>
+          <MaterialCommunityIcons name="book-plus" size={24} color="#fff" />
+          <Text style={styles.sellBookText}>Sell Your Books</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Recent Books Section */}
+      <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Featured Books</Text>
-            <TouchableOpacity onPress={() => handleSeeAll('featured')}>
+          <Text style={styles.sectionTitle}>Recent Books</Text>
+          <TouchableOpacity onPress={handleSeeAllRecent}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.booksScrollView}>
-            {featuredBooks.map(renderBookCard)}
-          </ScrollView>
         </View>
 
-        {/* Special Offers */}
-        <TouchableOpacity style={styles.offerBanner}>
-          <View style={styles.offerContent}>
-            <MaterialIcons name="local-offer" size={24} color="#fff" />
-            <View style={styles.offerTextContainer}>
-              <Text style={styles.offerTitle}>Special Offer!</Text>
-              <Text style={styles.offerDescription}>Get 10% off on your first purchase</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color="#00796b" style={styles.loader} />
+        ) : filteredBooks.length > 0 ? (
+          <FlatList
+            data={filteredBooks.slice(0, 5)}
+            renderItem={({ item }) => renderBookCard(item)}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.booksContainer}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="book-open-variant" size={64} color="#ccc" />
+            <Text style={styles.emptyStateText}>No books found in this category</Text>
                 </View>
+        )}
               </View>
-          <View style={styles.offerButton}>
-            <Text style={styles.offerButtonText}>Claim</Text>
-          </View>
-        </TouchableOpacity>
 
-        {/* Recently Added */}
-        <View style={styles.section}>
+      {/* Featured Books Section */}
+      <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recently Added</Text>
-            <TouchableOpacity onPress={() => handleSeeAll('recent')}>
+            <Text style={styles.sectionTitle}>Featured Books</Text>
+            <TouchableOpacity onPress={handleSeeAllFeatured}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.booksScrollView}>
-            {filteredBooks.map(book => (
-              <TouchableOpacity 
-                key={book.id} 
-                style={styles.bookCard}
-                onPress={() => navigation.navigate('BookDetails', { bookId: book.id })}
-              >
-                <View style={styles.bookImageContainer}>
-                  <Image source={book.image} style={styles.bookImage} />
-                  <View style={styles.timeStampBadge}>
-                    <Text style={styles.timeStampText}>{book.postedDate}</Text>
-                  </View>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>
-                      {Math.round((1 - parseInt(book.price.substring(1)) / parseInt(book.originalPrice.substring(1))) * 100)}% OFF
-                    </Text>
-                  </View>
-                  <TouchableOpacity style={styles.wishlistButton}>
-                    <AntDesign name="heart" size={18} color="#00796b" />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.bookInfo}>
-                  <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-                  <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>
-                  <View style={styles.bookMeta}>
-                    <Text style={styles.bookPrice}>{book.price}</Text>
-                    <Text style={styles.bookOriginalPrice}>{book.originalPrice}</Text>
-                  </View>
-                  <View style={styles.bookFooter}>
-                    <View style={styles.ratingContainer}>
-                      <AntDesign name="star" size={12} color="#FFD700" />
-                      <Text style={styles.ratingText}>{book.rating}</Text>
-                      <Text style={styles.reviewsText}>({book.reviews})</Text>
-                    </View>
-                    <Text style={styles.location}>
-                      <Ionicons name="location-outline" size={12} color="#666" />
-                      {book.location}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-        </ScrollView>
+        
+        {loading ? (
+          <ActivityIndicator size="large" color="#00796b" style={styles.loader} />
+        ) : filteredBooks.filter(book => book.featured).length > 0 ? (
+          <FlatList
+            data={filteredBooks.filter(book => book.featured).slice(0, 5)}
+            renderItem={({ item }) => renderBookCard(item)}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.booksContainer}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="star-off" size={64} color="#ccc" />
+            <Text style={styles.emptyStateText}>No featured books in this category</Text>
+          </View>
+        )}
       </View>
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleSellBook}>
-          <AntDesign name="plus" size={24} color="#fff" />
-          <Text style={styles.actionText}>Sell Book</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.secondaryActionButton]}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.secondaryActionButton]}
+          onPress={() => navigation.navigate('Wishlist')}
+        >
           <MaterialCommunityIcons name="bookmark-outline" size={24} color="#fff" />
           <Text style={styles.actionText}>Wishlist</Text>
         </TouchableOpacity>
@@ -638,17 +665,6 @@ const styles = StyleSheet.create({
     fontSize: wp('3.5%'),
     marginBottom: 12,
   },
-  bannerButton: {
-    backgroundColor: '#00796b',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  bannerButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
   searchContainer: {
     zIndex: 1000,
     backgroundColor: '#fff',
@@ -724,7 +740,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#00796b',
   },
-  section: {
+  sectionContainer: {
     padding: wp('4%'),
   },
   sectionHeader: {
@@ -742,10 +758,10 @@ const styles = StyleSheet.create({
     color: '#00796b',
     fontWeight: '500',
   },
-  categoriesList: {
+  categoriesContainer: {
     paddingRight: wp('4%'),
   },
-  categoryCard: {
+  categoryItem: {
     backgroundColor: '#fff',
     padding: wp('3%'),
     marginRight: wp('3%'),
@@ -758,7 +774,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  activeCategoryCard: {
+  activeCategoryItem: {
     backgroundColor: '#00796b',
   },
   categoryName: {
@@ -767,7 +783,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-  activeCategoryText: {
+  activeCategoryName: {
     color: '#fff',
   },
   categoryCount: {
@@ -775,7 +791,10 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  booksScrollView: {
+  activeCategoryCount: {
+    fontWeight: 'bold',
+  },
+  booksContainer: {
     paddingRight: wp('4%'),
   },
   bookCard: {
@@ -818,8 +837,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    padding: 6,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 8,
     borderRadius: 20,
   },
   bookInfo: {
@@ -896,42 +915,13 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 4,
   },
-  offerBanner: {
-    backgroundColor: '#00796b',
-    margin: wp('4%'),
-    borderRadius: 8,
-    padding: wp('3%'),
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  offerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  offerTextContainer: {
-    marginLeft: 12,
-  },
-  offerTitle: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: wp('3.8%'),
-  },
-  offerDescription: {
-    color: '#e0f2f1',
-    fontSize: wp('3%'),
-  },
-  offerButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-  },
-  offerButtonText: {
-    color: '#00796b',
-    fontWeight: 'bold',
-  },
+  offerBanner: undefined,
+  offerContent: undefined,
+  offerTextContainer: undefined,
+  offerTitle: undefined,
+  offerDescription: undefined,
+  offerButton: undefined,
+  offerButtonText: undefined,
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1003,11 +993,43 @@ const styles = StyleSheet.create({
     fontSize: wp('2.8%'),
     fontWeight: '500',
   },
-  activeCategoryName: {
-    color: '#fff',
+  sellBookButton: {
+    backgroundColor: '#00796b',
+    marginHorizontal: wp('4%'),
+    marginVertical: hp('1.5%'),
+    padding: wp('4%'),
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  activeCategoryCount: {
-    fontWeight: 'bold',
+  sellBookContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sellBookText: {
+    color: '#fff',
+    fontSize: wp('4%'),
+    fontWeight: '600',
+    marginLeft: wp('2%'),
+  },
+  loader: {
+    marginTop: hp('5%'),
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    color: '#ccc',
+    fontSize: wp('3%'),
+    marginTop: 16,
   },
 });
 

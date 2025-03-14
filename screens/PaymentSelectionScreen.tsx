@@ -43,6 +43,7 @@ const PaymentSelectionScreen = () => {
 
   const [selectedPayment, setSelectedPayment] = useState<string>('');
   const [upiId, setUpiId] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const validateAddress = () => {
     const fields = Object.entries(address);
@@ -67,17 +68,15 @@ const PaymentSelectionScreen = () => {
     if (!validateAddress()) return;
 
     try {
+      setIsProcessing(true);
+      
       // Save address to database
       await DatabaseService.saveAddress(address);
 
       switch (selectedPayment) {
         case 'cod':
           // Process COD order
-          navigation.navigate('PaymentGateway', { 
-            book,
-            paymentMethod: 'cod',
-            address
-          });
+          await handlePlaceOrder();
           break;
 
         case 'upi':
@@ -85,35 +84,58 @@ const PaymentSelectionScreen = () => {
             Alert.alert('Error', 'Please enter UPI ID');
             return;
           }
-          navigation.navigate('PaymentGateway', {
-            book,
-            paymentMethod: 'upi',
-            address,
-            upiId
-          });
+          await handlePlaceOrder();
           break;
 
         case 'card':
-          navigation.navigate('PaymentGateway', {
-            book,
-            paymentMethod: 'card',
-            address
-          });
+          await handlePlaceOrder();
           break;
 
         case 'netbanking':
-          navigation.navigate('PaymentGateway', {
-            book,
-            paymentMethod: 'netbanking',
-            address
-          });
+          await handlePlaceOrder();
           break;
 
         default:
           Alert.alert('Error', 'Please select a payment method');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to process payment');
+      console.error('Error placing order:', error);
+      Alert.alert('Error', 'Failed to place order. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePlaceOrder = async () => {
+    try {
+      setIsProcessing(true);
+      
+      // Generate a unique order ID using timestamp and random string
+      const orderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create the order
+      const newOrder = {
+        id: orderId,
+        bookId: book.id,
+        userId: await DatabaseService.getCurrentUserId(),
+        paymentMethod: selectedPayment,
+        address: address,
+        status: 'pending',
+        upiId: selectedPayment === 'upi' ? upiId : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Save the order
+      await DatabaseService.createOrder(newOrder);
+      
+      // Navigate to payment success screen
+      navigation.navigate('PaymentSuccess');
+    } catch (error) {
+      console.error('Error placing order:', error);
+      Alert.alert('Error', 'Failed to place order. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -238,21 +260,27 @@ const PaymentSelectionScreen = () => {
           <Text style={styles.sectionTitle}>Order Summary</Text>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Book Price</Text>
-            <Text style={styles.summaryValue}>₹{book.price}</Text>
+            <Text style={styles.summaryValue}>{DatabaseService.formatPrice(book.price)}</Text>
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Delivery Fee</Text>
-            <Text style={styles.summaryValue}>₹40</Text>
+            <Text style={styles.summaryValue}>{DatabaseService.formatPrice(40)}</Text>
           </View>
           <View style={[styles.summaryItem, styles.totalItem]}>
             <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>₹{book.price + 40}</Text>
+            <Text style={styles.totalValue}>
+              {DatabaseService.formatPrice(
+                (typeof book.price === 'string' 
+                  ? parseFloat(book.price.replace(/[^\d.]/g, '')) 
+                  : Number(book.price)) + 40
+              )}
+            </Text>
           </View>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.proceedButton} onPress={handlePayment}>
+        <TouchableOpacity style={styles.proceedButton} onPress={handlePayment} disabled={isProcessing}>
           <Text style={styles.proceedButtonText}>Proceed to Pay</Text>
         </TouchableOpacity>
       </View>

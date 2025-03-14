@@ -3,14 +3,30 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { widthPercentageToDP as wp } from 'react-native-responsive-screen';
 import { COLORS } from '../constants';
+import { useNavigation } from '@react-navigation/native';
 
 interface CustomHeaderProps {
   title: string;
   onBack?: () => void;
   rightComponent?: React.ReactNode;
+  showNotification?: boolean;
 }
 
-const CustomHeader = ({ title, onBack, rightComponent }: CustomHeaderProps) => {
+const CustomHeader = ({ title, onBack, rightComponent, showNotification = false }: CustomHeaderProps) => {
+  const navigation = useNavigation();
+
+  const NotificationBell = () => (
+    <TouchableOpacity 
+      style={styles.bellContainer} 
+      onPress={() => navigation.navigate('Notifications')}
+    >
+      <Ionicons name="notifications-outline" size={24} color={COLORS.primary} />
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>3</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.header}>
       {onBack ? (
@@ -21,7 +37,7 @@ const CustomHeader = ({ title, onBack, rightComponent }: CustomHeaderProps) => {
         <View style={styles.placeholder} />
       )}
       <Text style={styles.title} numberOfLines={1}>{title}</Text>
-      {rightComponent || <View style={styles.placeholder} />}
+      {rightComponent || (showNotification ? <NotificationBell /> : <View style={styles.placeholder} />)}
     </View>
   );
 };
@@ -49,6 +65,26 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  bellContainer: {
+    padding: 8,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    right: 2,
+    top: 2,
+    backgroundColor: 'red',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: wp('3%'),
+    fontWeight: 'bold',
   },
 });
 

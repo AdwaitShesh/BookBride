@@ -62,41 +62,98 @@ const SellBook = () => {
     }
   };
 
-  const handleSubmit = async () => {
+  const validateForm = () => {
+    if (!formData.title.trim()) {
+      Alert.alert('Error', 'Please enter book title');
+      return false;
+    }
+    if (!formData.author.trim()) {
+      Alert.alert('Error', 'Please enter author name');
+      return false;
+    }
+    if (!formData.price.trim()) {
+      Alert.alert('Error', 'Please enter price');
+      return false;
+    }
+    const price = parseFloat(formData.price);
+    if (isNaN(price) || price <= 0) {
+      Alert.alert('Error', 'Please enter a valid price');
+      return false;
+    }
+    if (!formData.location.trim()) {
+      Alert.alert('Error', 'Please enter location');
+      return false;
+    }
+    if (!formData.sellerName.trim()) {
+      Alert.alert('Error', 'Please enter seller name');
+      return false;
+    }
     if (!image) {
       Alert.alert('Error', 'Please upload a book image');
-      return;
+      return false;
     }
+    return true;
+  };
 
-    if (!formData.title || !formData.author || !formData.price || !formData.location || !formData.sellerName) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+    
     try {
       setLoading(true);
       
-      await DatabaseService.addBook({
-        title: formData.title,
-        author: formData.author,
+      // Create a new book object with timestamp-based ID
+      const newBook = {
+        id: `book_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: formData.title.trim(),
+        author: formData.author.trim(),
+        description: '',
         price: parseFloat(formData.price),
-        location: formData.location,
-        sellerName: formData.sellerName,
-        condition: formData.condition,
-        imageUrl: image,
+        originalPrice: parseFloat(formData.price) * 1.5, // Set original price 50% higher
         category: formData.category,
-      });
-
-      Alert.alert('Success', 'Book listed successfully!', [
-        {
-          text: 'OK',
+        condition: formData.condition,
+        location: formData.location.trim(),
+        imageUrl: image,
+        image: { uri: image },
+        sellerName: formData.sellerName.trim(),
+        postedDate: new Date().toISOString(),
+        rating: 0,
+        reviews: 0
+      };
+      
+      // Add to global books pool
+      await DatabaseService.addBook(newBook);
+      
+      Alert.alert(
+        'Success',
+        'Your book has been listed successfully!',
+        [{ 
+          text: 'OK', 
           onPress: () => {
-            navigation.navigate('MainTabs');
-          },
-        },
-      ]);
+            // Reset form
+            setFormData({
+              title: '',
+              author: '',
+              price: '',
+              location: '',
+              sellerName: '',
+              condition: 'Good',
+              category: 'Engineering'
+            });
+            setImage(null);
+            // Navigate to Home tab in MainTabs
+            navigation.reset({
+              index: 0,
+              routes: [{ 
+                name: 'MainTabs',
+                params: { screen: 'Home' }
+              }],
+            });
+          }
+        }]
+      );
     } catch (error) {
-      Alert.alert('Error', 'Failed to list book. Please try again.');
+      console.error('Error submitting book:', error);
+      Alert.alert('Error', 'Failed to list your book. Please try again.');
     } finally {
       setLoading(false);
     }
