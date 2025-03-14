@@ -79,6 +79,14 @@ const HomePage = ({ user }: HomePageProps) => {
   const [recentlyAddedBooks, setRecentlyAddedBooks] = useState<BookItem[]>([]);
   const [featuredBooks, setFeaturedBooks] = useState<BookItem[]>([]);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchBooks();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const fetchBooks = async () => {
     try {
       const [recentBooks, featured] = await Promise.all([
@@ -91,14 +99,14 @@ const HomePage = ({ user }: HomePageProps) => {
         title: book.title,
         author: book.author,
         price: `₹${book.price}`,
-        originalPrice: `₹${book.price * 1.5}`, // Example calculation
+        originalPrice: `₹${book.price * 1.5}`,
         condition: book.condition,
         image: { uri: book.imageUrl },
-        rating: 4.5, // Default rating
-        reviews: 0, // Default reviews
+        rating: 4.5,
+        reviews: 0,
         seller: book.sellerName,
         location: book.location,
-        postedDate: 'Just now',
+        postedDate: formatPostedDate(book.postedDate),
       })));
 
       setFeaturedBooks(featured.map(book => ({
@@ -106,11 +114,11 @@ const HomePage = ({ user }: HomePageProps) => {
         title: book.title,
         author: book.author,
         price: `₹${book.price}`,
-        originalPrice: `₹${book.price * 1.5}`, // Example calculation
+        originalPrice: `₹${book.price * 1.5}`,
         condition: book.condition,
         image: { uri: book.imageUrl },
-        rating: 4.5, // Default rating
-        reviews: 0, // Default reviews
+        rating: 4.5,
+        reviews: 0,
         seller: book.sellerName,
         location: book.location,
         postedDate: 'Just now',
@@ -120,9 +128,23 @@ const HomePage = ({ user }: HomePageProps) => {
     }
   };
 
-  useEffect(() => {
-    fetchBooks();
-  }, []);
+  const formatPostedDate = (dateString: string) => {
+    const postedDate = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - postedDate.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      if (diffHours === 0) {
+        return 'Just now';
+      }
+      return `${diffHours}h ago`;
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    }
+    return `${diffDays} days ago`;
+  };
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -188,7 +210,7 @@ const HomePage = ({ user }: HomePageProps) => {
           </Text>
         </View>
         <TouchableOpacity style={styles.wishlistButton}>
-          <AntDesign name="heart" size={18} color="#ff6b6b" />
+          <AntDesign name="heart" size={18} color="#00796b" />
         </TouchableOpacity>
       </View>
       <View style={styles.bookInfo}>
@@ -413,7 +435,7 @@ const styles = StyleSheet.create({
     right: -5,
   },
   badge: {
-    backgroundColor: '#ff6b6b',
+    backgroundColor: '#00796b',
     borderRadius: 10,
     width: 18,
     height: 18,

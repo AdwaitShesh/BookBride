@@ -6,6 +6,7 @@ const ADDRESSES_KEY = '@addresses';
 const ORDERS_KEY = '@orders';
 const CART_KEY = '@cart';
 const USER_PROFILES_KEY = '@user_profiles';
+const RECENTLY_ADDED_KEY = '@recently_added';
 
 export interface Book {
   id: string;
@@ -83,16 +84,22 @@ export const DatabaseService = {
     }
   },
 
-  async addBook(book: Omit<Book, 'id' | 'postedDate'>): Promise<Book> {
+  async addBook(bookData: Omit<Book, 'id' | 'postedDate'>): Promise<Book> {
     try {
       const books = await this.getBooks();
-      const newBook: Book = {
-        ...book,
-        id: Date.now().toString(),
+      const newBook = {
+        ...bookData,
+        id: Date.now().toString(), // Generate unique ID
         postedDate: new Date().toISOString(),
       };
-      books.push(newBook);
-      await AsyncStorage.setItem(BOOKS_KEY, JSON.stringify(books));
+      
+      // Add to books list
+      await AsyncStorage.setItem(BOOKS_KEY, JSON.stringify([newBook, ...books]));
+      
+      // Update recently added books
+      const recentBooks = await this.getRecentBooks();
+      await AsyncStorage.setItem(RECENTLY_ADDED_KEY, JSON.stringify([newBook, ...recentBooks].slice(0, 10)));
+      
       return newBook;
     } catch (error) {
       console.error('Error adding book:', error);
@@ -100,12 +107,11 @@ export const DatabaseService = {
     }
   },
 
-  async getRecentBooks(limit: number = 3): Promise<Book[]> {
+  async getRecentBooks(): Promise<Book[]> {
     try {
-      const books = await this.getBooks();
-      return books
-        .sort((a, b) => new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime())
-        .slice(0, limit);
+      const recentBooksStr = await AsyncStorage.getItem(RECENTLY_ADDED_KEY);
+      if (!recentBooksStr) return [];
+      return JSON.parse(recentBooksStr);
     } catch (error) {
       console.error('Error getting recent books:', error);
       return [];

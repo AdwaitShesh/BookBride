@@ -79,7 +79,7 @@ const CartScreen = () => {
         style={styles.removeButton}
         onPress={() => handleRemoveFromCart(item.id)}
       >
-        <Ionicons name="trash-outline" size={24} color="#ff6b6b" />
+        <Ionicons name="trash-outline" size={24} color="#00796b" />
       </TouchableOpacity>
     </View>
   );

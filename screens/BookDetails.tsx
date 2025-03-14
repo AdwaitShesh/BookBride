@@ -363,11 +363,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     left: 0,
-    backgroundColor: '#ff6b6b',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderTopRightRadius: 4,
-    borderBottomRightRadius: 4,
+    backgroundColor: '#00796b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
   discountText: {
     color: '#fff',
@@ -661,6 +660,16 @@ const styles = StyleSheet.create({
     fontSize: wp('3.5%'),
     fontWeight: '500',
     marginLeft: 8,
+  },
+  wishlistButton: {
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#00796b',
+  },
+  wishlistIcon: {
+    color: '#00796b',
   },
 });
 

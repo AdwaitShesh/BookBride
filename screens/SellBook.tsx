@@ -86,7 +86,9 @@ const SellBook = () => {
       Alert.alert('Success', 'Book listed successfully!', [
         {
           text: 'OK',
-          onPress: () => navigation.goBack(),
+          onPress: () => {
+            navigation.navigate('Home');
+          },
         },
       ]);
     } catch (error) {
