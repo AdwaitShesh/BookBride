@@ -11,10 +11,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { DatabaseService, Book } from '../lib/database';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import CustomHeader from '../components/CustomHeader';
 
 type CartScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Cart'>;
 
@@ -24,8 +25,12 @@ const CartScreen = () => {
   const navigation = useNavigation<CartScreenNavigationProp>();
 
   useEffect(() => {
-    fetchCartItems();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchCartItems();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const fetchCartItems = async () => {
     try {
@@ -51,83 +56,88 @@ const CartScreen = () => {
     }
   };
 
-  const calculateTotal = () => {
-    return cartItems.reduce((total, item) => total + item.price, 0);
+  const handleBuyNow = (book: Book) => {
+    navigation.navigate('PaymentSelection', { book });
   };
 
-  const handleProceedToPayment = () => {
-    if (cartItems.length === 0) {
-      Alert.alert('Cart Empty', 'Please add items to your cart before proceeding');
-      return;
-    }
-    navigation.navigate('PaymentSelection', { book: cartItems[0] }); // For now, handle single item
-  };
-
-  const renderItem = ({ item }: { item: Book }) => (
+  const renderCartItem = ({ item }: { item: Book }) => (
     <View style={styles.cartItem}>
-      <Image 
-        source={{ uri: item.imageUrl }} 
-        style={styles.bookImage}
-        defaultSource={require('../assets/book1.jpg')}
-      />
-      <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.bookAuthor}>{item.author}</Text>
-        <Text style={styles.bookPrice}>₹{item.price}</Text>
-      </View>
-      <TouchableOpacity 
-        style={styles.removeButton}
-        onPress={() => handleRemoveFromCart(item.id)}
+      <TouchableOpacity
+        style={styles.itemContent}
+        onPress={() => navigation.navigate('BookDetails', { bookId: item.id })}
       >
-        <Ionicons name="trash-outline" size={24} color="#00796b" />
+        <Image source={{ uri: item.imageUrl }} style={styles.bookImage} />
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={styles.bookAuthor}>{item.author}</Text>
+          <View style={styles.priceContainer}>
+            <Text style={styles.price}>₹{item.price}</Text>
+            <Text style={styles.originalPrice}>
+              ₹{Math.round(item.price * 1.5)}
+            </Text>
+          </View>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.buyButton}
+              onPress={() => handleBuyNow(item)}
+            >
+              <Text style={styles.buyButtonText}>Buy Now</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => handleRemoveFromCart(item.id)}
+            >
+              <Ionicons name="trash-outline" size={24} color="#00796b" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const EmptyCartComponent = () => (
+    <View style={styles.emptyCart}>
+      <Ionicons name="cart-outline" size={64} color="#999" />
+      <Text style={styles.emptyText}>Your cart is empty</Text>
+      <TouchableOpacity
+        style={styles.shopButton}
+        onPress={() => navigation.navigate('MainTabs')}
+      >
+        <Text style={styles.shopButtonText}>Start Shopping</Text>
       </TouchableOpacity>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#00796b" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Shopping Cart</Text>
-        <View style={styles.placeholder} />
-      </View>
-
+      <CustomHeader title="My Cart" />
       <FlatList
         data={cartItems}
-        renderItem={renderItem}
+        renderItem={renderCartItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.cartList}
-        ListEmptyComponent={
-          <View style={styles.emptyCart}>
-            <MaterialCommunityIcons name="cart-outline" size={64} color="#999" />
-            <Text style={styles.emptyText}>Your cart is empty</Text>
-            <TouchableOpacity 
-              style={styles.shopButton}
-              onPress={() => navigation.navigate('Home')}
-            >
-              <Text style={styles.shopButtonText}>Continue Shopping</Text>
-            </TouchableOpacity>
-          </View>
-        }
+        ListEmptyComponent={EmptyCartComponent}
+        showsVerticalScrollIndicator={false}
       />
-
       {cartItems.length > 0 && (
         <View style={styles.footer}>
           <View style={styles.totalContainer}>
-            <Text style={styles.totalLabel}>Total:</Text>
-            <Text style={styles.totalAmount}>₹{calculateTotal()}</Text>
+            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalAmount}>
+              ₹{cartItems.reduce((sum, item) => sum + item.price, 0)}
+            </Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.checkoutButton}
-            onPress={handleProceedToPayment}
+            onPress={() => {
+              if (cartItems.length > 0) {
+                navigation.navigate('PaymentSelection', { book: cartItems[0] });
+              }
+            }}
           >
-            <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+            <Text style={styles.checkoutButtonText}>Checkout All</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -138,69 +148,75 @@ const CartScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: wp('4%'),
     backgroundColor: '#fff',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: wp('4.5%'),
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 40,
   },
   cartList: {
     padding: wp('4%'),
   },
   cartItem: {
-    flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: wp('3%'),
-    marginBottom: wp('3%'),
+    marginBottom: wp('4%'),
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
+  itemContent: {
+    flexDirection: 'row',
+    padding: wp('3%'),
+  },
   bookImage: {
-    width: wp('20%'),
-    height: wp('25%'),
+    width: wp('25%'),
+    height: hp('15%'),
     borderRadius: 4,
   },
   bookInfo: {
     flex: 1,
     marginLeft: wp('3%'),
-    justifyContent: 'space-between',
   },
   bookTitle: {
     fontSize: wp('3.8%'),
     fontWeight: '500',
     color: '#333',
+    marginBottom: 4,
   },
   bookAuthor: {
     fontSize: wp('3.2%'),
     color: '#666',
+    marginBottom: 8,
   },
-  bookPrice: {
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  price: {
     fontSize: wp('4%'),
     fontWeight: 'bold',
     color: '#00796b',
+  },
+  originalPrice: {
+    fontSize: wp('3.2%'),
+    color: '#999',
+    textDecorationLine: 'line-through',
+    marginLeft: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  buyButton: {
+    backgroundColor: '#00796b',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+  },
+  buyButtonText: {
+    color: '#fff',
+    fontWeight: '500',
   },
   removeButton: {
     padding: 8,

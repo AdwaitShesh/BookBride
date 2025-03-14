@@ -10,9 +10,12 @@ import PaymentGatewayScreen from '../screens/PaymentGatewayScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 import SellBook from '../screens/SellBook';
+import AllBooksScreen from '../screens/AllBooksScreen';
+import AuthPage from '../components/AuthPage';
 import { COLORS } from '../constants';
 
 export type RootStackParamList = {
+  Auth: undefined;
   MainTabs: undefined;
   BookDetails: { bookId: string };
   Cart: undefined;
@@ -20,6 +23,11 @@ export type RootStackParamList = {
   PaymentGateway: { book: any; paymentMethod: string; address: any; upiId?: string };
   OrderTracking: { orderId: string };
   SellBook: undefined;
+  AllBooks: {
+    title: string;
+    books: BookItem[];
+    type: 'recent' | 'featured';
+  };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -54,19 +62,23 @@ const TabNavigator = () => {
   );
 };
 
-const AppNavigator = () => {
+const AppNavigator = ({ initialRouteName = 'Auth' }) => {
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
       }}
+      initialRouteName={initialRouteName}
     >
+      <Stack.Screen name="Auth" component={AuthPage} />
       <Stack.Screen name="MainTabs" component={TabNavigator} />
       <Stack.Screen name="BookDetails" component={BookDetails} />
+      <Stack.Screen name="Cart" component={CartScreen} />
       <Stack.Screen name="PaymentSelection" component={PaymentSelectionScreen} />
       <Stack.Screen name="PaymentGateway" component={PaymentGatewayScreen} />
       <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
       <Stack.Screen name="SellBook" component={SellBook} />
+      <Stack.Screen name="AllBooks" component={AllBooksScreen} />
     </Stack.Navigator>
   );
 };

@@ -18,9 +18,11 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 import { useNavigation } from '@react-navigation/native';
 import { DatabaseService } from '../lib/database';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import CustomHeader from '../components/CustomHeader';
 
 type RootStackParamList = {
-  Home: undefined;
+  MainTabs: undefined;
   SellBook: undefined;
 };
 
@@ -37,6 +39,7 @@ const SellBook = () => {
     location: '',
     sellerName: '',
     condition: 'Good' as const,
+    category: 'Engineering' as const,
   });
 
   const pickImage = async () => {
@@ -81,13 +84,14 @@ const SellBook = () => {
         sellerName: formData.sellerName,
         condition: formData.condition,
         imageUrl: image,
+        category: formData.category,
       });
 
       Alert.alert('Success', 'Book listed successfully!', [
         {
           text: 'OK',
           onPress: () => {
-            navigation.navigate('Home');
+            navigation.navigate('MainTabs');
           },
         },
       ]);
@@ -98,16 +102,27 @@ const SellBook = () => {
     }
   };
 
+  const categories = [
+    'Engineering',
+    'Computer Science',
+    'Electronics',
+    'Mechanical',
+    'Civil',
+    'Chemical',
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#00796b" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sell Your Book</Text>
-      </View>
-
-      <ScrollView style={styles.content}>
+      <CustomHeader 
+        title="Sell Book" 
+        onBack={() => navigation.goBack()} 
+      />
+      <KeyboardAwareScrollView
+        enableOnAndroid
+        enableAutomaticScroll
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Image Upload Section */}
         <TouchableOpacity style={styles.imageUploadContainer} onPress={pickImage}>
           {image ? (
@@ -197,6 +212,35 @@ const SellBook = () => {
               ))}
             </View>
           </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Category</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.categoryContainer}
+            >
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryButton,
+                    formData.category === category && styles.categoryButtonActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, category })}
+                >
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      formData.category === category && styles.categoryButtonTextActive,
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </View>
 
         {/* Submit Button */}
@@ -214,7 +258,7 @@ const SellBook = () => {
             </>
           )}
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 };
@@ -224,25 +268,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  scrollContent: {
+    flexGrow: 1,
     padding: wp('4%'),
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: wp('4.5%'),
-    fontWeight: 'bold',
-    color: '#333',
-    marginLeft: wp('2%'),
-  },
-  content: {
-    flex: 1,
   },
   imageUploadContainer: {
     margin: wp('4%'),
@@ -341,6 +369,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: wp('4%'),
     fontWeight: 'bold',
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  categoryButton: {
+    backgroundColor: '#fff',
+    paddingHorizontal: wp('4%'),
+    paddingVertical: wp('2%'),
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  categoryButtonActive: {
+    backgroundColor: '#00796b',
+    borderColor: '#00796b',
+  },
+  categoryButtonText: {
+    color: '#666',
+    fontSize: wp('3.2%'),
+  },
+  categoryButtonTextActive: {
+    color: '#fff',
+    fontWeight: '500',
   },
 });
 

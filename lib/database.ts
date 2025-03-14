@@ -18,6 +18,7 @@ export interface Book {
   sellerName: string;
   location: string;
   postedDate: string;
+  category: 'Engineering' | 'Computer Science' | 'Electronics' | 'Mechanical' | 'Civil' | 'Chemical';
 }
 
 export interface UserProfile {
@@ -89,11 +90,10 @@ export const DatabaseService = {
       const books = await this.getBooks();
       const newBook = {
         ...bookData,
-        id: Date.now().toString(), // Generate unique ID
+        id: Date.now().toString(),
         postedDate: new Date().toISOString(),
       };
       
-      // Add to books list
       await AsyncStorage.setItem(BOOKS_KEY, JSON.stringify([newBook, ...books]));
       
       // Update recently added books
@@ -423,6 +423,19 @@ export const DatabaseService = {
     } catch (error) {
       console.error('Error getting order by id:', error);
       return null;
+    }
+  },
+
+  async getBooksByCategory(category: string): Promise<Book[]> {
+    try {
+      const books = await this.getBooks();
+      if (category === 'All') {
+        return books;
+      }
+      return books.filter(book => book.category === category);
+    } catch (error) {
+      console.error('Error getting books by category:', error);
+      return [];
     }
   },
 }; 

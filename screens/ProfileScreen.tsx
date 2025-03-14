@@ -21,6 +21,8 @@ import { COLORS, FONTS } from '../constants';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import CustomHeader from '../components/CustomHeader';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -104,6 +106,46 @@ const ProfileScreen = () => {
   const handleTrackOrder = (orderId: string) => {
     navigation.navigate('OrderTracking', { orderId });
   };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        { 
+          text: "Logout", 
+          onPress: async () => {
+            try {
+              // Clear all authentication data
+              await AsyncStorage.removeItem('user');
+              await AsyncStorage.removeItem('token');
+              await AsyncStorage.removeItem('refreshToken');
+              
+              // Navigate to Auth screen
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Auth' }],
+              });
+            } catch (error) {
+              console.error('Error during logout:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
+
+  const headerRight = (
+    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <Ionicons name="log-out-outline" size={24} color={COLORS.primary} />
+    </TouchableOpacity>
+  );
 
   if (loading && !userProfile.name) {
     return (
@@ -246,9 +288,10 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Profile</Text>
-      </View>
+      <CustomHeader 
+        title="My Profile" 
+        rightComponent={headerRight}
+      />
 
       <View style={styles.tabs}>
         <TouchableOpacity
@@ -289,6 +332,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  logoutButton: {
+    padding: 8,
   },
   header: {
     backgroundColor: '#fff',

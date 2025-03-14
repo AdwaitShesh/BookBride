@@ -31,6 +31,8 @@ import { DatabaseService, Book } from '../lib/database';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { SIZES, COLORS, FONTS } from '../constants';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import CustomHeader from '../components/CustomHeader';
 
 type BookDetailsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'BookDetails'>;
 
@@ -111,6 +113,17 @@ const BookDetails = () => {
     }
   };
 
+  const headerRight = (
+    <View style={styles.headerRight}>
+      <TouchableOpacity style={styles.iconButton}>
+        <Ionicons name="heart-outline" size={24} color={COLORS.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.iconButton}>
+        <Ionicons name="share-outline" size={24} color={COLORS.primary} />
+      </TouchableOpacity>
+    </View>
+  );
+
   if (loading || !book) {
     return (
       <View style={styles.loadingContainer}>
@@ -121,22 +134,16 @@ const BookDetails = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#00796b" />
-          </TouchableOpacity>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="heart-outline" size={24} color="#00796b" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="share-outline" size={24} color="#00796b" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
+      <CustomHeader 
+        title={book?.title || 'Book Details'} 
+        onBack={() => navigation.goBack()}
+        rightComponent={headerRight}
+      />
+      <KeyboardAwareScrollView
+        enableOnAndroid
+        enableAutomaticScroll
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Book Image */}
         <View style={styles.imageContainer}>
           <Image 
@@ -295,7 +302,7 @@ const BookDetails = () => {
             keyExtractor={(item) => item.id}
           />
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={styles.footer}>
         <View style={styles.priceContainer}>

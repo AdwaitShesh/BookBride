@@ -7,7 +7,7 @@ import { UserService } from '../lib/services/userService';
 
 type RootStackParamList = {
   Auth: undefined;
-  Home: { user: any };
+  MainTabs: { user: any };
 };
 
 type AuthPageProps = {
@@ -69,7 +69,7 @@ const AuthPage = ({ navigation }: AuthPageProps) => {
       setContact('');
       setUsername('');
 
-      navigation.navigate('Home', { user: result.user });
+      navigation.navigate('MainTabs', { user: result.user });
     } catch (error: any) {
       console.error('Registration error:', error);
       Alert.alert('Error', error.message || 'Failed to register user. Please try again.');
@@ -100,7 +100,7 @@ const AuthPage = ({ navigation }: AuthPageProps) => {
         await AsyncStorage.setItem('refreshToken', result.refreshToken);
       }
 
-      navigation.navigate('Home', { user: result.user });
+      navigation.navigate('MainTabs', { user: result.user });
     } catch (error: any) {
       console.error('Login error:', error);
       Alert.alert('Error', error.message || 'Failed to login. Please try again.');

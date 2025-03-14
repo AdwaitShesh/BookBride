@@ -34,6 +34,11 @@ type RootStackParamList = {
   SellBook: undefined;
   BookDetails: { bookId: string };
   Cart: undefined;
+  AllBooks: { 
+    title: string;
+    books: BookItem[];
+    type: 'recent' | 'featured';
+  };
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -63,6 +68,7 @@ type BookItem = {
   seller: string;
   location: string;
   postedDate: string;
+  category: string;
 };
 
 type CategoryItem = {
@@ -78,6 +84,9 @@ const HomePage = ({ user }: HomePageProps) => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [recentlyAddedBooks, setRecentlyAddedBooks] = useState<BookItem[]>([]);
   const [featuredBooks, setFeaturedBooks] = useState<BookItem[]>([]);
+  const [filteredBooks, setFilteredBooks] = useState<BookItem[]>([]);
+  const [searchResults, setSearchResults] = useState<BookItem[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -94,7 +103,7 @@ const HomePage = ({ user }: HomePageProps) => {
         DatabaseService.getFeaturedBooks(),
       ]);
 
-      setRecentlyAddedBooks(recentBooks.map(book => ({
+      const mappedRecentBooks = recentBooks.map(book => ({
         id: book.id,
         title: book.title,
         author: book.author,
@@ -107,7 +116,17 @@ const HomePage = ({ user }: HomePageProps) => {
         seller: book.sellerName,
         location: book.location,
         postedDate: formatPostedDate(book.postedDate),
-      })));
+        category: book.category,
+      }));
+
+      setRecentlyAddedBooks(mappedRecentBooks);
+      
+      // Filter books based on active category
+      if (activeCategory === 'All') {
+        setFilteredBooks(mappedRecentBooks);
+      } else {
+        setFilteredBooks(mappedRecentBooks.filter(book => book.category === activeCategory));
+      }
 
       setFeaturedBooks(featured.map(book => ({
         id: book.id,
@@ -167,34 +186,88 @@ const HomePage = ({ user }: HomePageProps) => {
     { name: 'Chemical', icon: 'flask', count: '600+' },
   ];
 
-  const renderCategoryItem = ({ item }: { item: CategoryItem }) => (
+  const handleCategoryPress = (category: string) => {
+    setActiveCategory(category);
+  };
+
+  const searchStringMatch = (text: string, searchTerm: string): boolean => {
+    const normalizedText = text.toLowerCase().trim();
+    const normalizedSearch = searchTerm.toLowerCase().trim();
+    
+    // Direct match check
+    if (normalizedText.includes(normalizedSearch)) return true;
+    
+    // Levenshtein distance for fuzzy matching
+    const distance = (str1: string, str2: string): number => {
+      const track = Array(str2.length + 1).fill(null).map(() =>
+        Array(str1.length + 1).fill(null));
+      for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
+      for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+      
+      for (let j = 1; j <= str2.length; j += 1) {
+        for (let i = 1; i <= str1.length; i += 1) {
+          const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+          track[j][i] = Math.min(
+            track[j][i - 1] + 1,
+            track[j - 1][i] + 1,
+            track[j - 1][i - 1] + indicator
+          );
+        }
+      }
+      return track[str2.length][str1.length];
+    };
+    
+    // Allow for small typos (distance threshold of 2)
+    return distance(normalizedText, normalizedSearch) <= 2;
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim()) {
+      const filtered = recentlyAddedBooks.filter(book =>
+        searchStringMatch(book.title, query) ||
+        searchStringMatch(book.author, query)
+      );
+      setSearchResults(filtered);
+      setShowSearchResults(true);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+
+  const SearchResultsDropdown = () => {
+    if (!showSearchResults || searchResults.length === 0) return null;
+
+    return (
+      <View style={styles.searchResultsContainer}>
+        <ScrollView style={styles.searchResultsList}>
+          {searchResults.map((book) => (
     <TouchableOpacity 
-      style={[
-        styles.categoryCard, 
-        activeCategory === item.name && styles.activeCategoryCard
-      ]}
-      onPress={() => setActiveCategory(item.name)}
-    >
-      <FontAwesome5 
-        name={item.icon} 
-        size={24} 
-        solid
-        color={activeCategory === item.name ? "#fff" : "#00796b"} 
-      />
-      <Text style={[
-        styles.categoryName,
-        activeCategory === item.name && styles.activeCategoryText
-      ]}>
-        {item.name}
+              key={book.id}
+              style={styles.searchResultItem}
+              onPress={() => {
+                navigation.navigate('BookDetails', { bookId: book.id });
+                setShowSearchResults(false);
+                setSearchQuery('');
+              }}
+            >
+              <Image source={book.image} style={styles.searchResultImage} />
+              <View style={styles.searchResultInfo}>
+                <Text style={styles.searchResultTitle} numberOfLines={1}>
+                  {book.title}
       </Text>
-      <Text style={[
-        styles.categoryCount,
-        activeCategory === item.name && styles.activeCategoryText
-      ]}>
-        {item.count} books
+                <Text style={styles.searchResultAuthor} numberOfLines={1}>
+                  {book.author}
       </Text>
+                <Text style={styles.searchResultPrice}>{book.price}</Text>
+              </View>
     </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
   );
+  };
 
   const renderBookCard = (book: BookItem) => (
     <TouchableOpacity 
@@ -235,9 +308,22 @@ const HomePage = ({ user }: HomePageProps) => {
     </TouchableOpacity>
   );
 
+  const handleSeeAll = (type: 'recent' | 'featured') => {
+    const books = type === 'recent' ? recentlyAddedBooks : featuredBooks;
+    const title = type === 'recent' ? 'Recently Added Books' : 'Featured Books';
+    navigation.navigate('AllBooks', { 
+      title,
+      books,
+      type
+    });
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar 
+        backgroundColor="#fff"
+        barStyle="dark-content"
+      />
       
       {/* Header */}
       <View style={styles.header}>
@@ -294,17 +380,28 @@ const HomePage = ({ user }: HomePageProps) => {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color="#666" />
         <TextInput
           style={styles.searchInput}
-            placeholder="Search for books, authors, or categories..."
+            placeholder="Search books..."
           value={searchQuery}
-          onChangeText={setSearchQuery}
+            onChangeText={handleSearch}
             placeholderTextColor="#999"
         />
-          <TouchableOpacity style={styles.filterButton}>
-            <Ionicons name="filter" size={20} color="#00796b" />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery('');
+                setShowSearchResults(false);
+              }}
+              style={styles.clearButton}
+            >
+              <Ionicons name="close-circle" size={20} color="#666" />
           </TouchableOpacity>
+          )}
+        </View>
+        <SearchResultsDropdown />
       </View>
 
       {/* Categories */}
@@ -315,21 +412,47 @@ const HomePage = ({ user }: HomePageProps) => {
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={categories}
-            renderItem={renderCategoryItem}
-            keyExtractor={(item) => item.name}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {categories.map(category => (
+              <TouchableOpacity
+                key={category.name}
+                style={[
+                  styles.categoryCard,
+                  activeCategory === category.name && styles.activeCategoryCard,
+                ]}
+                onPress={() => handleCategoryPress(category.name)}
+              >
+                <FontAwesome5
+                  name={category.icon}
+                  size={24}
+                  color={activeCategory === category.name ? '#fff' : '#00796b'}
+                />
+                <Text
+                  style={[
+                    styles.categoryName,
+                    activeCategory === category.name && styles.activeCategoryName,
+                  ]}
+                >
+                  {category.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.categoryCount,
+                    activeCategory === category.name && styles.activeCategoryCount,
+                  ]}
+                >
+                  {category.count}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
       </View>
 
       {/* Featured Books */}
       <View style={styles.section}>
           <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Featured Books</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => handleSeeAll('featured')}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
@@ -356,12 +479,52 @@ const HomePage = ({ user }: HomePageProps) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recently Added</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => handleSeeAll('recent')}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.booksScrollView}>
-            {recentlyAddedBooks.map(renderBookCard)}
+            {filteredBooks.map(book => (
+              <TouchableOpacity 
+                key={book.id} 
+                style={styles.bookCard}
+                onPress={() => navigation.navigate('BookDetails', { bookId: book.id })}
+              >
+                <View style={styles.bookImageContainer}>
+                  <Image source={book.image} style={styles.bookImage} />
+                  <View style={styles.timeStampBadge}>
+                    <Text style={styles.timeStampText}>{book.postedDate}</Text>
+                  </View>
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountText}>
+                      {Math.round((1 - parseInt(book.price.substring(1)) / parseInt(book.originalPrice.substring(1))) * 100)}% OFF
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.wishlistButton}>
+                    <AntDesign name="heart" size={18} color="#00796b" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.bookInfo}>
+                  <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+                  <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>
+                  <View style={styles.bookMeta}>
+                    <Text style={styles.bookPrice}>{book.price}</Text>
+                    <Text style={styles.bookOriginalPrice}>{book.originalPrice}</Text>
+                  </View>
+                  <View style={styles.bookFooter}>
+                    <View style={styles.ratingContainer}>
+                      <AntDesign name="star" size={12} color="#FFD700" />
+                      <Text style={styles.ratingText}>{book.rating}</Text>
+                      <Text style={styles.reviewsText}>({book.reviews})</Text>
+                    </View>
+                    <Text style={styles.location}>
+                      <Ionicons name="location-outline" size={12} color="#666" />
+                      {book.location}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
         </ScrollView>
       </View>
 
@@ -384,7 +547,7 @@ const HomePage = ({ user }: HomePageProps) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
@@ -487,28 +650,79 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   searchContainer: {
+    zIndex: 1000,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingHorizontal: wp('4%'),
+    paddingVertical: wp('2%'),
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    margin: wp('4%'),
-    padding: wp('3%'),
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: wp('3%'),
     borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  searchIcon: {
-    marginRight: 8,
+    height: hp('5%'),
   },
   searchInput: {
     flex: 1,
-    fontSize: wp('3.8%'),
+    marginLeft: 8,
+    fontSize: wp('3.5%'),
     color: '#333',
   },
-  filterButton: {
-    padding: 5,
+  clearButton: {
+    padding: 4,
+  },
+  searchResultsContainer: {
+    position: 'absolute',
+    top: hp('8%'),
+    left: wp('4%'),
+    right: wp('4%'),
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    maxHeight: hp('40%'),
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    zIndex: 1000,
+  },
+  searchResultsList: {
+    padding: wp('2%'),
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    padding: wp('2%'),
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    alignItems: 'center',
+  },
+  searchResultImage: {
+    width: wp('15%'),
+    height: wp('20%'),
+    borderRadius: 4,
+    marginRight: wp('3%'),
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultTitle: {
+    fontSize: wp('3.5%'),
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  searchResultAuthor: {
+    fontSize: wp('3%'),
+    color: '#666',
+    marginBottom: 2,
+  },
+  searchResultPrice: {
+    fontSize: wp('3.5%'),
+    fontWeight: '600',
+    color: '#00796b',
   },
   section: {
     padding: wp('4%'),
@@ -774,6 +988,26 @@ const styles = StyleSheet.create({
     color: '#666',
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  timeStampBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 121, 107, 0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  timeStampText: {
+    color: '#fff',
+    fontSize: wp('2.8%'),
+    fontWeight: '500',
+  },
+  activeCategoryName: {
+    color: '#fff',
+  },
+  activeCategoryCount: {
+    fontWeight: 'bold',
   },
 });
 
