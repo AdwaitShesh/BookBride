@@ -1,9 +1,23 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Alert, 
+  Switch,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView
+} from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { UserService } from '../lib/services/userService';
+import { COLORS } from '../constants';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 type RootStackParamList = {
   Auth: undefined;
@@ -110,143 +124,168 @@ const AuthPage = ({ navigation }: AuthPageProps) => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>{isRegistering ? 'Register' : 'Login'}</Text>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.logoContainer}>
+          <MaterialCommunityIcons name="book-open-page-variant" size={60} color={COLORS.primary} />
+          <Text style={styles.logoText}>BookBride</Text>
+        </View>
         
-        {isRegistering ? (
-          <>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={24} color="#00796b" style={styles.icon} />
-              <TextInput 
-                placeholder="Name" 
-                value={name} 
-                onChangeText={setName} 
-                style={styles.input} 
-              />
-            </View>
+        <View style={styles.card}>
+          <Text style={styles.title}>{isRegistering ? 'Register' : 'Login'}</Text>
+          
+          {isRegistering ? (
+            <>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={24} color="#00796b" style={styles.icon} />
+                <TextInput 
+                  placeholder="Name" 
+                  value={name} 
+                  onChangeText={setName} 
+                  style={styles.input} 
+                />
+              </View>
 
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-circle-outline" size={24} color="#00796b" style={styles.icon} />
-              <TextInput 
-                placeholder="Username" 
-                value={username} 
-                onChangeText={setUsername} 
-                style={styles.input} 
-                autoCapitalize="none"
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={24} color="#00796b" style={styles.icon} />
-              <TextInput 
-                placeholder="Email" 
-                value={email} 
-                onChangeText={setEmail} 
-                style={styles.input} 
-                keyboardType="email-address" 
-                autoCapitalize="none"
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={24} color="#00796b" style={styles.icon} />
-              <TextInput 
-                placeholder="Password" 
-                value={password} 
-                onChangeText={setPassword} 
-                style={styles.input} 
-                secureTextEntry 
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={24} color="#00796b" style={styles.icon} />
-              <TextInput 
-                placeholder="Contact No" 
-                value={contact} 
-                onChangeText={setContact} 
-                style={styles.input} 
-                keyboardType="phone-pad" 
-              />
-            </View>
-            
-            <TouchableOpacity 
-              style={[styles.button, isLoading && styles.buttonDisabled]} 
-              onPress={handleRegister}
-              disabled={isLoading}
-            >
-              <Text style={styles.buttonText}>{isLoading ? 'Registering...' : 'Register'}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={() => setIsRegistering(false)}>
-              <Text style={styles.switchText}>Already have an account? Login</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={24} color="#00796b" style={styles.icon} />
-              <TextInput 
-                placeholder="Username" 
-                value={loginUsername} 
-                onChangeText={setLoginUsername} 
-                style={styles.input} 
-                autoCapitalize="none"
-              />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={24} color="#00796b" style={styles.icon} />
-              <TextInput 
-                placeholder="Password" 
-                value={password} 
-                onChangeText={setPassword} 
-                style={styles.input} 
-                secureTextEntry 
-              />
-            </View>
-            
-            <View style={styles.rememberContainer}>
-              <Switch
-                value={rememberMe}
-                onValueChange={setRememberMe}
-                trackColor={{ false: "#767577", true: "#81b0ff" }}
-                thumbColor={rememberMe ? "#00796b" : "#f4f3f4"}
-              />
-              <Text style={styles.rememberText}>Remember me</Text>
-            </View>
-            
-            <TouchableOpacity 
-              style={[styles.button, isLoading && styles.buttonDisabled]} 
-              onPress={handleLogin}
-              disabled={isLoading}
-            >
-              <Text style={styles.buttonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={() => setIsRegistering(true)}>
-              <Text style={styles.switchText}>Don't have an account? Register</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-circle-outline" size={24} color="#00796b" style={styles.icon} />
+                <TextInput 
+                  placeholder="Username" 
+                  value={username} 
+                  onChangeText={setUsername} 
+                  style={styles.input} 
+                  autoCapitalize="none"
+                />
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Ionicons name="mail-outline" size={24} color="#00796b" style={styles.icon} />
+                <TextInput 
+                  placeholder="Email" 
+                  value={email} 
+                  onChangeText={setEmail} 
+                  style={styles.input} 
+                  keyboardType="email-address" 
+                  autoCapitalize="none"
+                />
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={24} color="#00796b" style={styles.icon} />
+                <TextInput 
+                  placeholder="Password" 
+                  value={password} 
+                  onChangeText={setPassword} 
+                  style={styles.input} 
+                  secureTextEntry 
+                />
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Ionicons name="call-outline" size={24} color="#00796b" style={styles.icon} />
+                <TextInput 
+                  placeholder="Contact No" 
+                  value={contact} 
+                  onChangeText={setContact} 
+                  style={styles.input} 
+                  keyboardType="phone-pad" 
+                />
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.button, isLoading && styles.buttonDisabled]} 
+                onPress={handleRegister}
+                disabled={isLoading}
+              >
+                <Text style={styles.buttonText}>{isLoading ? 'Registering...' : 'Register'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={() => setIsRegistering(false)}>
+                <Text style={styles.switchText}>Already have an account? Login</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={24} color="#00796b" style={styles.icon} />
+                <TextInput 
+                  placeholder="Username" 
+                  value={loginUsername} 
+                  onChangeText={setLoginUsername} 
+                  style={styles.input} 
+                  autoCapitalize="none"
+                />
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={24} color="#00796b" style={styles.icon} />
+                <TextInput 
+                  placeholder="Password" 
+                  value={password} 
+                  onChangeText={setPassword} 
+                  style={styles.input} 
+                  secureTextEntry 
+                />
+              </View>
+              
+              <View style={styles.rememberContainer}>
+                <Switch
+                  value={rememberMe}
+                  onValueChange={setRememberMe}
+                  trackColor={{ false: "#767577", true: "#81b0ff" }}
+                  thumbColor={rememberMe ? "#00796b" : "#f4f3f4"}
+                />
+                <Text style={styles.rememberText}>Remember me</Text>
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.button, isLoading && styles.buttonDisabled]} 
+                onPress={handleLogin}
+                disabled={isLoading}
+              >
+                <Text style={styles.buttonText}>{isLoading ? 'Logging in...' : 'Login'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={() => setIsRegistering(true)}>
+                <Text style={styles.switchText}>Don't have an account? Register</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#e0f7fa',
-    padding: 20,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: wp('5%'),
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: hp('4%'),
+  },
+  logoText: {
+    fontSize: wp('8%'),
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginTop: hp('1%'),
   },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 10,
-    padding: 20,
+    padding: wp('5%'),
     width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
