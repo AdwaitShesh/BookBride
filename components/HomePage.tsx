@@ -25,6 +25,16 @@ import {
 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
+import { useNavigation } from '@react-navigation/native';
+import { DatabaseService, Book } from '../lib/database';
+import type { StackNavigationProp } from '@react-navigation/stack';
+
+type RootStackParamList = {
+  Home: undefined;
+  SellBook: undefined;
+};
+
+type NavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
 
 const { width } = Dimensions.get('window');
 
@@ -36,18 +46,10 @@ type User = {
 
 type HomePageProps = {
   user: User;
-  navigation?: any;
-};
-
-// Define types for category and book items
-type CategoryItem = {
-  name: string;
-  icon: string;
-  count: string;
 };
 
 type BookItem = {
-  id: number;
+  id: string;
   title: string;
   author: string;
   price: string;
@@ -61,17 +63,75 @@ type BookItem = {
   postedDate: string;
 };
 
-const HomePage = ({ user, navigation }: HomePageProps) => {
+type CategoryItem = {
+  name: string;
+  icon: string;
+  count: string;
+};
+
+const HomePage = ({ user }: HomePageProps) => {
+  const navigation = useNavigation<NavigationProp>();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [recentlyAddedBooks, setRecentlyAddedBooks] = useState<BookItem[]>([]);
+  const [featuredBooks, setFeaturedBooks] = useState<BookItem[]>([]);
+
+  const fetchBooks = async () => {
+    try {
+      const [recentBooks, featured] = await Promise.all([
+        DatabaseService.getRecentBooks(),
+        DatabaseService.getFeaturedBooks(),
+      ]);
+
+      setRecentlyAddedBooks(recentBooks.map(book => ({
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        price: `₹${book.price}`,
+        originalPrice: `₹${book.price * 1.5}`, // Example calculation
+        condition: book.condition,
+        image: { uri: book.imageUrl },
+        rating: 4.5, // Default rating
+        reviews: 0, // Default reviews
+        seller: book.sellerName,
+        location: book.location,
+        postedDate: 'Just now',
+      })));
+
+      setFeaturedBooks(featured.map(book => ({
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        price: `₹${book.price}`,
+        originalPrice: `₹${book.price * 1.5}`, // Example calculation
+        condition: book.condition,
+        image: { uri: book.imageUrl },
+        rating: 4.5, // Default rating
+        reviews: 0, // Default reviews
+        seller: book.sellerName,
+        location: book.location,
+        postedDate: 'Just now',
+      })));
+    } catch (error) {
+      console.error('Error fetching books:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchBooks();
+  }, []);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
+    fetchBooks().finally(() => {
       setRefreshing(false);
-    }, 2000);
+    });
   }, []);
+
+  const handleSellBook = () => {
+    navigation.navigate('SellBook');
+  };
 
   const categories: CategoryItem[] = [
     { name: 'All', icon: 'book', count: '5k+' },
@@ -81,96 +141,6 @@ const HomePage = ({ user, navigation }: HomePageProps) => {
     { name: 'Mechanical', icon: 'tools', count: '900+' },
     { name: 'Civil', icon: 'hard-hat', count: '750+' },
     { name: 'Chemical', icon: 'flask', count: '600+' },
-  ];
-
-  const featuredBooks: BookItem[] = [
-    {
-      id: 1,
-      title: 'Data Structures and Algorithms',
-      author: 'Thomas H. Cormen',
-      price: '₹450',
-      originalPrice: '₹800',
-      condition: 'Like New',
-      image: require('../assets/book1.jpg'),
-      rating: 4.5,
-      reviews: 28,
-      seller: 'Rahul M.',
-      location: 'Delhi',
-      postedDate: '2 days ago',
-    },
-    {
-      id: 2,
-      title: 'Computer Networks',
-      author: 'Andrew S. Tanenbaum',
-      price: '₹380',
-      originalPrice: '₹650',
-      condition: 'Good',
-      image: require('../assets/book2.jpg'),
-      rating: 4.2,
-      reviews: 15,
-      seller: 'Priya K.',
-      location: 'Mumbai',
-      postedDate: '5 days ago',
-    },
-    {
-      id: 3,
-      title: 'Digital Electronics',
-      author: 'Morris Mano',
-      price: '₹290',
-      originalPrice: '₹550',
-      condition: 'Fair',
-      image: require('../assets/book3.jpg'),
-      rating: 3.8,
-      reviews: 12,
-      seller: 'Amit S.',
-      location: 'Bangalore',
-      postedDate: '1 week ago',
-    },
-  ];
-
-  const recentlyAddedBooks: BookItem[] = [
-    {
-      id: 4,
-      title: 'Engineering Mathematics',
-      author: 'B.S. Grewal',
-      price: '₹320',
-      originalPrice: '₹600',
-      condition: 'Good',
-      image: require('../assets/book2.jpg'),
-      rating: 4.0,
-      reviews: 18,
-      seller: 'Neha G.',
-      location: 'Pune',
-      postedDate: '1 day ago',
-    },
-    {
-      id: 5,
-      title: 'Strength of Materials',
-      author: 'R.K. Bansal',
-      price: '₹280',
-      originalPrice: '₹520',
-      condition: 'Like New',
-      image: require('../assets/book3.jpg'),
-      rating: 4.3,
-      reviews: 9,
-      seller: 'Vikram P.',
-      location: 'Chennai',
-      postedDate: '3 days ago',
-    },
-    {
-      id: 6,
-      title: 'Fluid Mechanics',
-      author: 'Frank M. White',
-      price: '₹350',
-      originalPrice: '₹680',
-      condition: 'Good',
-      image: require('../assets/book1.jpg'),
-      rating: 4.1,
-      reviews: 14,
-      seller: 'Sanjay R.',
-      location: 'Hyderabad',
-      postedDate: '4 days ago',
-    },
   ];
 
   const renderCategoryItem = ({ item }: { item: CategoryItem }) => (
@@ -261,7 +231,7 @@ const HomePage = ({ user, navigation }: HomePageProps) => {
           </TouchableOpacity>
           <View style={styles.logoContainer}>
             <MaterialCommunityIcons name="book-open-page-variant" size={28} color="#00796b" />
-            <Text style={styles.logo}>BookBride</Text>
+          <Text style={styles.logo}>BookBride</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -304,27 +274,27 @@ const HomePage = ({ user, navigation }: HomePageProps) => {
               </TouchableOpacity>
             </View>
           </ImageBackground>
-        </View>
+      </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
             placeholder="Search for books, authors, or categories..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
             placeholderTextColor="#999"
-          />
+        />
           <TouchableOpacity style={styles.filterButton}>
             <Ionicons name="filter" size={20} color="#00796b" />
           </TouchableOpacity>
-        </View>
+      </View>
 
-        {/* Categories */}
-        <View style={styles.section}>
+      {/* Categories */}
+      <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Categories</Text>
+        <Text style={styles.sectionTitle}>Categories</Text>
             <TouchableOpacity>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -337,12 +307,12 @@ const HomePage = ({ user, navigation }: HomePageProps) => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesList}
           />
-        </View>
+      </View>
 
-        {/* Featured Books */}
-        <View style={styles.section}>
+      {/* Featured Books */}
+      <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Featured Books</Text>
+        <Text style={styles.sectionTitle}>Featured Books</Text>
             <TouchableOpacity>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -359,8 +329,8 @@ const HomePage = ({ user, navigation }: HomePageProps) => {
             <View style={styles.offerTextContainer}>
               <Text style={styles.offerTitle}>Special Offer!</Text>
               <Text style={styles.offerDescription}>Get 10% off on your first purchase</Text>
-            </View>
-          </View>
+                </View>
+              </View>
           <View style={styles.offerButton}>
             <Text style={styles.offerButtonText}>Claim</Text>
           </View>
@@ -376,21 +346,21 @@ const HomePage = ({ user, navigation }: HomePageProps) => {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.booksScrollView}>
             {recentlyAddedBooks.map(renderBookCard)}
-          </ScrollView>
-        </View>
+        </ScrollView>
+      </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionButton}>
-            <AntDesign name="plus" size={24} color="#fff" />
-            <Text style={styles.actionText}>Sell Book</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.secondaryActionButton]}>
-            <MaterialCommunityIcons name="bookmark-outline" size={24} color="#fff" />
-            <Text style={styles.actionText}>Wishlist</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleSellBook}>
+          <AntDesign name="plus" size={24} color="#fff" />
+          <Text style={styles.actionText}>Sell Book</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionButton, styles.secondaryActionButton]}>
+          <MaterialCommunityIcons name="bookmark-outline" size={24} color="#fff" />
+          <Text style={styles.actionText}>Wishlist</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
