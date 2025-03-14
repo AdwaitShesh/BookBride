@@ -32,6 +32,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 type RootStackParamList = {
   Home: undefined;
   SellBook: undefined;
+  BookDetails: { bookId: string };
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -173,7 +174,11 @@ const HomePage = ({ user }: HomePageProps) => {
   );
 
   const renderBookCard = (book: BookItem) => (
-    <TouchableOpacity key={book.id} style={styles.bookCard}>
+    <TouchableOpacity 
+      key={book.id} 
+      style={styles.bookCard}
+      onPress={() => navigation.navigate('BookDetails', { bookId: book.id })}
+    >
       <View style={styles.bookImageContainer}>
         <Image source={book.image} style={styles.bookImage} />
         <View style={styles.discountBadge}>
@@ -186,34 +191,22 @@ const HomePage = ({ user }: HomePageProps) => {
         </TouchableOpacity>
       </View>
       <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={1}>{book.title}</Text>
+        <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
         <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>
-        
-        <View style={styles.ratingContainer}>
-          <AntDesign name="star" size={14} color="#FFD700" />
-          <Text style={styles.ratingText}>{book.rating} ({book.reviews})</Text>
+        <View style={styles.bookMeta}>
+          <Text style={styles.bookPrice}>{book.price}</Text>
+          <Text style={styles.bookOriginalPrice}>{book.originalPrice}</Text>
         </View>
-        
-        <View style={styles.bookDetails}>
-          <View>
-            <Text style={styles.bookPrice}>{book.price}</Text>
-            <Text style={styles.originalPrice}>{book.originalPrice}</Text>
+        <View style={styles.bookFooter}>
+          <View style={styles.ratingContainer}>
+            <AntDesign name="star" size={12} color="#FFD700" />
+            <Text style={styles.ratingText}>{book.rating}</Text>
+            <Text style={styles.reviewsText}>({book.reviews})</Text>
           </View>
-          <Text style={[
-            styles.bookCondition,
-            book.condition === 'Like New' ? styles.conditionNew : 
-            book.condition === 'Good' ? styles.conditionGood : 
-            styles.conditionFair
-          ]}>
-            {book.condition}
+          <Text style={styles.location}>
+            <Ionicons name="location-outline" size={12} color="#666" />
+            {book.location}
           </Text>
-        </View>
-        
-        <View style={styles.sellerInfo}>
-          <Feather name="user" size={12} color="#666" />
-          <Text style={styles.sellerText}>{book.seller}</Text>
-          <Entypo name="location-pin" size={12} color="#666" />
-          <Text style={styles.locationText}>{book.location}</Text>
         </View>
       </View>
     </TouchableOpacity>
